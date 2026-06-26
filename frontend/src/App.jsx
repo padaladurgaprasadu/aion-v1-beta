@@ -264,9 +264,9 @@ function App() {
       }
   }
 
-  if (!session) {
-    return <Auth />
-  }
+  // if (!session) {
+  //   return <Auth />
+  // }
 
   return (
     <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#0f0f0f', color: '#ececec', overflow: 'hidden' }}>
