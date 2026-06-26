@@ -9,3 +9,5 @@ uvicorn
 langchain-community
 langchain-ollama
 ollama
+slowapi
+langchain-openai
