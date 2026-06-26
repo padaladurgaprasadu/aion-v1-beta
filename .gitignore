@@ -1,0 +1,30 @@
+# API Keys and Secrets (CRITICAL)
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+.venv/
+.Python
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+.npm
+
+# AiON Specific Caches & Generated Projects
+aion_vite_cache/
+generated_projects/
+generated_project/
+chroma_db/
+aion_project.zip
+
+# OS Files
+.DS_Store
+Thumbs.db

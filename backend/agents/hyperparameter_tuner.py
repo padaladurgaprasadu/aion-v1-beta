@@ -1,0 +1,67 @@
+from backend.agents.base import BaseAgent
+from langchain_core.messages import HumanMessage, SystemMessage
+from backend.orchestrator.state import AiONState
+import json
+
+class AutoHyperparameterTuningAgent(BaseAgent):
+    def __init__(self):
+        super().__init__(temperature=0.2)
+        
+    def run(self, state: AiONState) -> dict:
+        """Generates advanced hyperparameter tuning scripts."""
+        
+        # Only execute if the role is ML-related
+        ml_roles = ["Machine Learning Engineer", "Data Scientist", "Deep Learning Researcher"]
+        if state.get("agent_role") not in ml_roles:
+            return {"code_files": state.get("code_files", {})}
+            
+        print("🤖 [Auto HP Tuner] Generating Optuna/Ray Tune optimization scripts...")
+        
+        goal = state.get("goal")
+        blueprint = state.get("blueprint", {})
+        code_files = state.get("code_files", {})
+        
+        system_prompt = """You are the AiON Auto Hyperparameter Tuning Agent.
+Your job is to analyze the user's ML goal and the current codebase (specifically the training loop), and generate an advanced hyperparameter optimization script using Optuna (or Ray Tune).
+The script MUST include:
+1. Definition of the objective function.
+2. The hyperparameter search space (e.g., learning rate, batch size, dropout, num_layers).
+3. The study/optimization loop.
+4. Saving the best hyperparameters to a JSON file.
+
+Return ONLY a JSON object containing the new or updated files. Do NOT use markdown code blocks like ```json.
+Format:
+{
+  "tune.py": "import optuna\\n..."
+}"""
+
+        prompt = f"""
+Goal: {goal}
+Blueprint: {json.dumps(blueprint, indent=2)}
+
+Current Code Files:
+{json.dumps(code_files, indent=2)}
+
+Generate the hyperparameter tuning script and return the valid JSON object.
+"""
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=prompt)
+        ]
+        
+        try:
+            response = self.llm.invoke(messages)
+            content = response.content
+            if isinstance(content, list):
+                content = "".join(c.get("text", "") if isinstance(c, dict) else str(c) for c in content)
+            
+            content = content.strip().strip('`').replace('json\n', '').strip()
+            new_files = json.loads(content, strict=False)
+            
+            # Merge new files into existing code files
+            merged_files = {**code_files, **new_files}
+            return {"code_files": merged_files}
+            
+        except Exception as e:
+            print(f"⚠️ [Auto HP Tuner] Failed to generate tuning logic: {e}")
+            return {"code_files": code_files}

@@ -1,0 +1,61 @@
+import os
+from neo4j import GraphDatabase
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Neo4jClient:
+    def __init__(self):
+        # We will load these from the .env file
+        uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        user = os.getenv("NEO4J_USER", "neo4j")
+        password = os.getenv("NEO4J_PASSWORD", "aion_password123")
+        
+        if password == "your_neo4j_password_here":
+            print("[WARNING] Please update your NEO4J_PASSWORD in the .env file!")
+            
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+
+    def close(self):
+        self.driver.close()
+
+    def run_query(self, query, parameters=None):
+        with self.driver.session() as session:
+            result = session.run(query, parameters)
+            return [record.data() for record in result]
+
+    def log_project(self, project_id, goal):
+        """Creates a Project node in the database."""
+        query = """
+        MERGE (p:Project {id: $project_id})
+        SET p.goal = $goal, p.created_at = timestamp()
+        RETURN p
+        """
+        self.run_query(query, {"project_id": project_id, "goal": goal})
+
+    def log_decision(self, project_id, agent_name, rationale):
+        """Logs a decision made by an agent and links it to the project."""
+        query = """
+        MATCH (p:Project {id: $project_id})
+        CREATE (d:Decision {
+            agent: $agent_name, 
+            rationale: $rationale, 
+            timestamp: timestamp()
+        })
+        CREATE (p)-[:HAS_DECISION]->(d)
+        RETURN d
+        """
+        self.run_query(query, {
+            "project_id": project_id,
+            "agent_name": agent_name,
+            "rationale": rationale
+        })
+
+    def get_project_decisions(self, project_id):
+        """Retrieves all decisions for a specific project."""
+        query = """
+        MATCH (p:Project {id: $project_id})-[:HAS_DECISION]->(d:Decision)
+        RETURN d.agent AS agent, d.rationale AS rationale
+        ORDER BY d.timestamp ASC
+        """
+        return self.run_query(query, {"project_id": project_id})

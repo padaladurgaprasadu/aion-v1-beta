@@ -1,0 +1,76 @@
+import json
+import re
+from langchain_core.prompts import ChatPromptTemplate
+from backend.agents.base import BaseAgent
+from backend.orchestrator.state import AiONState
+
+class DevOpsAgent(BaseAgent):
+    """
+    The DevOps Agent analyzes the completed codebase and automatically generates
+    production-ready deployment infrastructure, including Dockerfiles,
+    Docker Compose orchestration (with Prometheus/Grafana observability),
+    and GitHub Actions CI/CD pipelines.
+    """
+    def __init__(self):
+        super().__init__()
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are a Senior Principal DevOps Engineer. Your goal is to take a raw codebase and make it production-ready and highly observable.\n\n"
+                       "Based on the provided blueprint and code files, you must generate exactly THREE files:\n"
+                       "1. 'Dockerfile' (A multi-stage build Dockerfile for the application)\n"
+                       "2. 'docker-compose.yml' (Orchestrates the app, databases, and includes Prometheus & Grafana for observability)\n"
+                       "3. '.github/workflows/deploy.yml' (A CI/CD pipeline for testing and deployment)\n\n"
+                       "Output MUST be in valid JSON format mapping file paths to file contents. Do not include markdown formatting like ```json. Example:\n"
+                       "{{\n  \"Dockerfile\": \"...\",\n  \"docker-compose.yml\": \"...\",\n  \".github/workflows/deploy.yml\": \"...\"\n}}"),
+            ("human", "Blueprint:\n{blueprint}\n\nFiles:\n{code_files}")
+        ])
+        self.chain = self.prompt | self.llm
+
+    def run(self, state: AiONState) -> AiONState:
+        print("[DevOps] Generating deployment files (Docker, CI/CD)...")
+        
+        # Format files for the prompt (TOKEN OPTIMIZATION)
+        # The DevOps agent only needs backend dependencies and entry points to write a Dockerfile.
+        # We strip out frontend components (.jsx, .css) to save massive amounts of tokens.
+        formatted_files = ""
+        for path, content in (state.get("code_files") or {}).items():
+            if path.endswith((".jsx", ".css", ".html")) or "client/src/components" in path:
+                continue
+            formatted_files += f"\n--- File: {path} ---\n{content}\n"
+
+        response = self.chain.invoke({
+            "blueprint": json.dumps(state.get("blueprint", {})),
+            "code_files": formatted_files
+        })
+        
+        content = response.content
+        if isinstance(content, list):
+            content = "".join(c.get("text", "") if isinstance(c, dict) else str(c) for c in content)
+        
+        # Clean up potential markdown formatting from the response
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[7:]
+        if content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        content = content.strip()
+        
+        try:
+            # strict=False allows literal \n and \t in strings (fixing the Invalid control character error)
+            devops_files = json.loads(content, strict=False)
+            
+            # Merge the new infrastructure files into the project's code_files
+            current_files = state.get("code_files", {})
+            for path, file_content in devops_files.items():
+                print(f"   -> [DevOps] Generated infrastructure file: {path}")
+                current_files[path] = file_content
+                
+            state["code_files"] = current_files
+            
+        except json.JSONDecodeError as e:
+            print(f"   -> [DevOps] ERROR parsing DevOps files: {e}")
+            # Non-fatal error, the project still works without Docker
+            pass
+
+        return state
