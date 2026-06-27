@@ -17,3 +17,4 @@ class AiONState(TypedDict):
     revision_count: int
     execution_retries: int
     execution_logs: Optional[list[str]]
+    semantic_context: Optional[str]

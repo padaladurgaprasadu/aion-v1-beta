@@ -20,17 +20,21 @@ class AIMLModelTrainingAgent(BaseAgent):
         goal = state.get("goal")
         blueprint = state.get("blueprint", {})
         code_files = state.get("code_files", {})
+        semantic_context = state.get("semantic_context", "No context available.")
         
         system_prompt = """You are the AiON AI/ML Model Training Agent.
-Your job is to analyze the user's ML goal and the current codebase, and generate a highly robust `train.py` script.
-The script MUST include:
-1. Data loading and preprocessing.
-2. The complete model training loop (PyTorch, TensorFlow, or Scikit-learn).
-3. Loss functions and optimizers.
-4. Evaluation metrics (Accuracy, F1, MSE, etc.).
-5. Model saving/checkpointing logic.
+Your job is to analyze the user's ML goal and the current codebase, and generate a HIGH-QUALITY, robust `train.py` script.
+Use the provided Semantic Context from past successful projects to guide your architectural decisions.
 
-Return ONLY a JSON object containing the new or updated files. Do NOT use markdown code blocks like ```json.
+The script MUST include:
+1. Robust data loading and preprocessing (handling missing values, normalization, train/val/test splits).
+2. The complete model training loop (PyTorch, TensorFlow, or Scikit-learn) with detailed comments.
+3. Proper Loss functions and optimizers (with learning rate scheduling if applicable).
+4. Evaluation metrics (Accuracy, F1, MSE, etc.) evaluated on a validation set during training.
+5. Model saving/checkpointing logic (save the best model, not just the last epoch).
+6. Excellent error handling and exception logging.
+
+Return ONLY a valid JSON object containing the new or updated files. Do NOT use markdown code blocks like ```json.
 Format:
 {
   "train.py": "import torch\\n..."
@@ -40,10 +44,13 @@ Format:
 Goal: {goal}
 Blueprint: {json.dumps(blueprint, indent=2)}
 
+Semantic Context (Past Successes):
+{semantic_context}
+
 Current Code Files:
 {json.dumps(code_files, indent=2)}
 
-Generate the robust training scripts and return the valid JSON object.
+Generate the highly robust training scripts and return the valid JSON object.
 """
         messages = [
             SystemMessage(content=system_prompt),

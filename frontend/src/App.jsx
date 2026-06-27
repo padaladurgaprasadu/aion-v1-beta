@@ -413,6 +413,27 @@ function App() {
               border: '1px solid #333',
               boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
             }}>
+              <select
+                value={agentRole}
+                onChange={(e) => setAgentRole(e.target.value)}
+                style={{
+                  backgroundColor: '#333',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '16px',
+                  padding: '10px 14px',
+                  marginRight: '8px',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="Fullstack Web Developer">Fullstack Web Dev</option>
+                <option value="Machine Learning Engineer">ML Engineer</option>
+                <option value="Deep Learning Researcher">Deep Learning Researcher</option>
+                <option value="Data Scientist">Data Scientist</option>
+                <option value="AI Systems Architect">AI Systems Architect</option>
+              </select>
               <input 
                 type="text" 
                 value={chatInput} 

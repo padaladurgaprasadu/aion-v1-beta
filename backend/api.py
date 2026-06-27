@@ -121,7 +121,8 @@ async def websocket_generate(websocket: WebSocket):
             review_feedback=None,
             revision_count=0,
             execution_retries=0,
-            execution_logs=[]
+            execution_logs=[],
+            semantic_context=None
         )
         
         graph = build_generate_graph()

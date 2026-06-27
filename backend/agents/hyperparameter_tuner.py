@@ -20,16 +20,20 @@ class AutoHyperparameterTuningAgent(BaseAgent):
         goal = state.get("goal")
         blueprint = state.get("blueprint", {})
         code_files = state.get("code_files", {})
+        semantic_context = state.get("semantic_context", "No context available.")
         
         system_prompt = """You are the AiON Auto Hyperparameter Tuning Agent.
-Your job is to analyze the user's ML goal and the current codebase (specifically the training loop), and generate an advanced hyperparameter optimization script using Optuna (or Ray Tune).
-The script MUST include:
-1. Definition of the objective function.
-2. The hyperparameter search space (e.g., learning rate, batch size, dropout, num_layers).
-3. The study/optimization loop.
-4. Saving the best hyperparameters to a JSON file.
+Your job is to analyze the user's ML goal and the current codebase (specifically the training loop), and generate an advanced, highly robust hyperparameter optimization script using Optuna.
+Use the provided Semantic Context from past successful projects to guide your optimization strategies.
 
-Return ONLY a JSON object containing the new or updated files. Do NOT use markdown code blocks like ```json.
+The script MUST include:
+1. Definition of the objective function incorporating cross-validation.
+2. A comprehensive hyperparameter search space (e.g., learning rate, batch size, dropout, num_layers, optimizer type).
+3. The Optuna study/optimization loop with early stopping/pruning enabled (e.g., MedianPruner).
+4. Saving the best hyperparameters to a structured JSON file.
+5. Excellent error handling and exception logging.
+
+Return ONLY a valid JSON object containing the new or updated files. Do NOT use markdown code blocks like ```json.
 Format:
 {
   "tune.py": "import optuna\\n..."
@@ -39,10 +43,13 @@ Format:
 Goal: {goal}
 Blueprint: {json.dumps(blueprint, indent=2)}
 
+Semantic Context (Past Successes):
+{semantic_context}
+
 Current Code Files:
 {json.dumps(code_files, indent=2)}
 
-Generate the hyperparameter tuning script and return the valid JSON object.
+Generate the highly robust tuning script and return the valid JSON object.
 """
         messages = [
             SystemMessage(content=system_prompt),

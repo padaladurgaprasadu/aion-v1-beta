@@ -66,6 +66,7 @@ class ArchitectAgent(BaseAgent):
             blueprint = json.loads(content.strip().strip('`').replace('json\n', ''))
             print(f"   -> Tech Stack Selected: {blueprint.get('tech_stack', [])}")
             state["blueprint"] = blueprint
+            state["semantic_context"] = context
             
             # Log decision to memory
             try:

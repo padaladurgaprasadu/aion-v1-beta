@@ -12,7 +12,7 @@ class CoderAgent(BaseAgent):
     def __init__(self):
         super().__init__()
 
-    def _generate_single_file(self, blueprint_str, feedback, runtime_error, target_file, agent_role):
+    def _generate_single_file(self, blueprint_str, feedback, runtime_error, target_file, agent_role, semantic_context):
         
         # Dynamically adapt rules based on agent_role
         if "Research" in agent_role:
@@ -22,11 +22,11 @@ class CoderAgent(BaseAgent):
         else:
             framework_rules = "3. CRITICAL PORT RULE: The app must run on port 3000 for the iframe preview.\n4. CRITICAL FRAMEWORK RULE: Write modular, clean code using the appropriate Python libraries for ML/Data Science (e.g. Pandas, Scikit-learn, PyTorch, Streamlit, FastAPI). Ensure all dependencies are documented in requirements.txt.\n5. Do NOT write React code unless explicitly requested in the blueprint. Use Streamlit for simple UIs.\n6. POSTGRESQL RULE: If using PostgreSQL, you MUST strictly use the connection string 'postgresql://postgres:postgres@localhost:5432/postgres'. Do NOT use environment variables for DB connections."
 
-        system_prompt = f"You are a Senior AI {agent_role}. Given a blueprint, write the FULL production-grade content for the requested file: {{target_file}}.\n\nIMPORTANT RULES:\n1. Output the file EXACTLY in this format:\n\n<file path=\"{{target_file}}\">\n[YOUR CODE/CONTENT HERE]\n</file>\n\n2. Do NOT use JSON. Do not use markdown backticks outside of the file tags.\n{framework_rules}\n10. If you receive Review Feedback or a Runtime Error, you must fix the issues mentioned."
+        system_prompt = f"You are a Senior AI {agent_role}. Given a blueprint and semantic context from past successful projects, write the FULL production-grade content for the requested file: {{target_file}}.\n\nIMPORTANT RULES:\n1. Output the file EXACTLY in this format:\n\n<file path=\"{{target_file}}\">\n[YOUR CODE/CONTENT HERE]\n</file>\n\n2. Do NOT use JSON. Do not use markdown backticks outside of the file tags.\n{framework_rules}\n10. If you receive Review Feedback or a Runtime Error, you must fix the issues mentioned."
 
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
-            ("human", "Blueprint: {blueprint}\nTarget File: {target_file}\nReview Feedback: {review_feedback}\nRuntime Error: {runtime_error}")
+            ("human", "Blueprint: {blueprint}\nSemantic Context: {context}\nTarget File: {target_file}\nReview Feedback: {review_feedback}\nRuntime Error: {runtime_error}")
         ])
         chain = prompt | self.llm
         
@@ -37,6 +37,7 @@ class CoderAgent(BaseAgent):
             try:
                 response = chain.invoke({
                     "blueprint": blueprint_str,
+                    "context": semantic_context,
                     "target_file": target_file,
                     "review_feedback": feedback,
                     "runtime_error": runtime_error
@@ -79,6 +80,7 @@ class CoderAgent(BaseAgent):
         code_files = {}
         
         agent_role = state.get("agent_role", "Fullstack Web Developer")
+        semantic_context = state.get("semantic_context", "No semantic context provided.")
         
         # Increment revision count if we are looping
         if feedback != "None" or runtime_error != "None":
@@ -90,7 +92,7 @@ class CoderAgent(BaseAgent):
         # OpenRouter supports concurrent requests, so we can generate files much faster!
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             futures = [
-                executor.submit(self._generate_single_file, blueprint_str, feedback, runtime_error, f, agent_role)
+                executor.submit(self._generate_single_file, blueprint_str, feedback, runtime_error, f, agent_role, semantic_context)
                 for f in files_to_generate
             ]
             
