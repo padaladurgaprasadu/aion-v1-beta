@@ -9,6 +9,7 @@ function App() {
   
   const [goal, setGoal] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isPlanning, setIsPlanning] = useState(false)
   const [error, setError] = useState(null)
   
   // Auth state
@@ -189,8 +190,13 @@ function App() {
     if (!buildGoal) return
 
     setIsLoading(true)
+    setIsPlanning(true)
     setError(null)
-    setStep(1) // Show loading state
+    setBlueprintJson("")
+    
+    // We immediately go to step 2 so the user can watch the stream!
+    setStep(2) 
+    setIsLoading(false) // We won't use the generic spinner anymore
 
     try {
       const response = await fetch(`${API_URL}/api/plan`, {
@@ -201,16 +207,48 @@ function App() {
         },
         body: JSON.stringify({ goal: buildGoal, agent_role: buildRole })
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.detail || 'Failed to plan project')
       
-      setProjectId(data.project_id)
-      setBlueprintJson(JSON.stringify(data.blueprint, null, 2))
-      setStep(2) // Move to review step
+      if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || 'Failed to plan project');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      
+      let fullBlueprint = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.type === 'metadata') {
+                        setProjectId(data.project_id);
+                    } else if (data.type === 'token') {
+                        fullBlueprint += data.token;
+                        setBlueprintJson(fullBlueprint);
+                    } else if (data.type === 'error') {
+                        setError(data.message);
+                    }
+                } catch (e) {
+                    console.error("Error parsing stream line:", line);
+                }
+            }
+        }
+      }
+      
     } catch (err) {
       setError(err.message)
+      setStep(1)
     } finally {
-      setIsLoading(false)
+      setIsPlanning(false)
     }
   }
 
@@ -246,6 +284,19 @@ function App() {
         
         if (data.type === "progress") {
           setLiveUpdates(prev => [...prev, data.message])
+        } else if (data.type === "file_start") {
+          setLiveCodeFiles(prev => ({ ...prev, [data.file]: "" }))
+          setLiveUpdates(prev => [...prev, `Writing code for ${data.file}...`])
+        } else if (data.type === "code_token") {
+          setLiveCodeFiles(prev => {
+             const fileKeys = Object.keys(prev);
+             if (fileKeys.length === 0) return prev;
+             const lastFile = fileKeys[fileKeys.length - 1];
+             return {
+                 ...prev,
+                 [lastFile]: prev[lastFile] + data.token
+             };
+          })
         } else if (data.type === "complete") {
           setCodeFiles(data.code_files)
           setExecutionLogs(data.execution_logs)
@@ -561,11 +612,11 @@ function App() {
                 disabled={isLoading}
             />
             <div style={{display: 'flex', gap: '10px', marginTop: '15px'}}>
-                <button className="build-btn" style={{backgroundColor: '#333'}} onClick={() => setStep(1)} disabled={isLoading}>
+                <button className="build-btn" style={{backgroundColor: '#333'}} onClick={() => setStep(1)} disabled={isLoading || isPlanning}>
                     ⬅️ Go Back
                 </button>
-                <button className="build-btn" onClick={handleGenerate} disabled={isLoading}>
-                    {isLoading ? 'Generating Code & Installing...' : '✅ Approve & Generate Code'}
+                <button className="build-btn" onClick={handleGenerate} disabled={isLoading || isPlanning}>
+                    {isPlanning ? 'Architect is typing...' : (isLoading ? 'Generating Code & Installing...' : '✅ Approve & Generate Code')}
                 </button>
             </div>
           </div>
@@ -634,20 +685,36 @@ function App() {
                 </div>
               )}
               
-              {/* LOADING OVERLAY for Workspace */}
-              {isLoading && step !== 3 && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,10,10,0.8)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 50, backdropFilter: 'blur(4px)' }}>
-                  <div className="spinner" style={{ width: '40px', height: '40px', marginBottom: '20px' }}></div>
-                  <h3 style={{ margin: 0, marginBottom: '20px', fontWeight: '500' }}>{step === 1 ? 'Planning Architecture...' : 'Writing Code...'}</h3>
+              {/* LIVE CODE VIEWER OVERLAY for Workspace */}
+              {isLoading && step === 2 && (
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,10,10,0.95)', display: 'flex', flexDirection: 'column', zIndex: 50, padding: '30px', animation: 'fadeIn 0.3s ease-out' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                     <h3 style={{ margin: 0, fontWeight: '500', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div className="spinner" style={{ width: '20px', height: '20px' }}></div>
+                        Writing Code...
+                     </h3>
+                     <span style={{ color: '#888', fontSize: '0.9rem' }}>Streaming Live from AiON Coder Agent</span>
+                  </div>
                   
-                  {step === 2 && liveUpdates.length > 0 && (
-                    <div style={{ backgroundColor: '#111', padding: '20px', borderRadius: '12px', color: '#00ff00', fontFamily: 'monospace', fontSize: '0.9rem', width: '80%', maxWidth: '600px', maxHeight: '200px', overflowY: 'auto', border: '1px solid #333' }}>
-                      {liveUpdates.map((msg, i) => (
-                        <div key={i} style={{ marginBottom: '8px' }}>&gt; {msg}</div>
-                      ))}
-                      <div className="cursor-blink" style={{ display: 'inline-block', width: '8px', height: '14px', backgroundColor: '#00ff00', marginLeft: '5px' }}></div>
-                    </div>
-                  )}
+                  <div style={{ flex: 1, backgroundColor: '#0d0d0d', borderRadius: '12px', border: '1px solid #333', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+                     {/* Tab Bar */}
+                     <div style={{ backgroundColor: '#1a1a1a', padding: '10px 15px', borderBottom: '1px solid #333', display: 'flex', gap: '10px', overflowX: 'auto' }}>
+                        {Object.keys(liveCodeFiles).map(file => (
+                           <div key={file} style={{ padding: '6px 12px', backgroundColor: '#333', borderRadius: '6px', fontSize: '0.85rem', color: '#fff', whiteSpace: 'nowrap', border: '1px solid #444' }}>
+                              📄 {file}
+                           </div>
+                        ))}
+                     </div>
+                     {/* Code View */}
+                     <div style={{ flex: 1, padding: '20px', overflowY: 'auto', color: '#a6accd', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                           {Object.keys(liveCodeFiles).length > 0 
+                             ? liveCodeFiles[Object.keys(liveCodeFiles)[Object.keys(liveCodeFiles).length - 1]] 
+                             : "Initializing Coder Agent...\nReading Blueprint...\nSetting up environment..."}
+                           <span className="cursor-blink" style={{ display: 'inline-block', width: '8px', height: '14px', backgroundColor: '#a6accd', marginLeft: '2px', verticalAlign: 'middle' }}></span>
+                        </pre>
+                     </div>
+                  </div>
                 </div>
               )}
             </div>

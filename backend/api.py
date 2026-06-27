@@ -55,49 +55,83 @@ class GenerateRequest(BaseModel):
 @app.post("/api/plan")
 @limiter.limit("10/minute")
 async def plan_project(request_data: PlanRequest, request: Request, auth: str = Depends(verify_token)):
+    from fastapi.responses import StreamingResponse
+    import json
+    from backend.agents.planner import PlannerAgent
+    from backend.agents.architect import ArchitectAgent
+    from backend.memory.chroma_client import ChromaClient
+    from langchain_core.messages import SystemMessage, HumanMessage
+
     if not request_data.goal:
         raise HTTPException(status_code=400, detail="Goal is required")
 
-    # If x_api_key isn't provided, fallback to .env later in BaseAgent
     project_id = f"proj-{str(uuid.uuid4())[:8]}"
     goal = re.sub(r'<[^>]*>', '', request_data.goal)
     
     try:
         memory_client = Neo4jClient()
-        memory_client.log_project(project_id, request.goal)
+        memory_client.log_project(project_id, request_data.goal)
         memory_client.close()
     except Exception as e:
         print(f"Warning: Could not log to Neo4j: {e}")
 
-    initial_state = AiONState(
-        goal=goal,
-        project_id=project_id,
-        agent_role=request_data.agent_role,
-        modules=[],
-        blueprint={},
-        code_files={},
-        error=None,
-        review_feedback=None,
-        revision_count=0,
-        execution_logs=[]
-    )
+    # 1. Run Planner synchronously
+    planner = PlannerAgent()
+    state = AiONState(goal=goal, project_id=project_id, agent_role=request_data.agent_role, modules=[])
+    planned_state = planner.run(state)
+    modules = planned_state.get("modules", [])
+
+    # 2. Setup Architect Stream
+    architect = ArchitectAgent()
+    
+    # Dynamically define architectural rules based on role (mirroring architect.py)
+    agent_role = request_data.agent_role
+    if "Research" in agent_role:
+        tech_rule = "CRITICAL ARCHITECTURE RULE: You MUST design a research document structure instead of software. Your 'tech_stack' should list the methodologies or research fields involved. Your 'file_structure' MUST only include markdown files (e.g., 'research_paper.md', 'literature_review.md', 'methodology.md'). Do NOT include code files like package.json or server.js."
+    elif "Fullstack" in agent_role or "Web" in agent_role or "UI" in agent_role:
+        framework_rules = "4. CRITICAL REACT REQUIREMENT: Do NOT include 'client/public/index.html', 'client/src/index.js', 'client/src/main.jsx', or 'client/package.json' in your file_structure! The backend will automatically scaffold the React app using Vite. You ONLY need to list the components you create (e.g., 'client/src/App.jsx', 'client/src/components/Dashboard.jsx') and the root 'package.json'.\n5. CRITICAL COMPONENT REQUIREMENT: Every single React component (e.g. Dashboard, Login, Navbar) you plan to use MUST be explicitly listed as a separate file with a '.jsx' extension in 'file_structure'. If you don't list it, it will never be generated and the app will crash with 'Module not found'.\n6. CRITICAL RUN REQUIREMENT: You MUST include a root 'package.json' with a 'dev' script that uses 'concurrently' to run the backend and the Vite frontend at the same time."
+        tech_rule = f"CRITICAL ARCHITECTURE RULE: You MUST ALWAYS build a FULLSTACK application with a Node.js (Express) backend and a React frontend. \nCRITICAL DB RULE: You MUST use PostgreSQL for the database using the 'pg' library. IMPORTANT: Hardcode the database connection string or pool config to use user 'postgres', password 'postgres', host 'localhost', port 5432, database 'postgres' as a fallback if env vars are missing.\nCRITICAL PORT RULE: Your backend MUST run on PORT 5000. Your React frontend MUST run on PORT 3000. \n{framework_rules}"
+    else:
+        tech_rule = "CRITICAL ARCHITECTURE RULE: You MUST build a Python-based application using frameworks suitable for ML/Data Science (e.g., Streamlit, FastAPI, Flask). Do NOT use React or Express. The app must run on port 3000 for the iframe preview (e.g., streamlit run app.py --server.port=3000). You MUST include a 'requirements.txt' file and a 'start.sh' or 'start.bat' script to launch it."
+        
+    system_prompt = f"You are a Senior Systems Architect acting as a {agent_role}. Given a goal and a list of modules, design a technology stack and a blueprint. Use the provided Past Projects as inspiration if relevant.\n\n{tech_rule}\n\nReturn ONLY valid JSON with three keys: 'tech_stack' (a list of strings), 'blueprint_notes' (a short string), and 'file_structure' (a list of 5 to 10 file paths needed for the app). Do not include markdown formatting or backticks, just the raw JSON."
 
     try:
-        graph = build_plan_graph()
-        final_state = graph.invoke(initial_state)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        vector_db = ChromaClient()
+        past_projects = vector_db.find_similar_projects(goal)
+        context = "\n---\n".join(past_projects) if past_projects else "No past projects found."
+    except Exception:
+        context = "No past projects found."
 
-    return {
-        "project_id": project_id,
-        "goal": request.goal,
-        "blueprint": final_state.get("blueprint", {})
-    }
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=f"Goal: {goal}\nModules: {','.join(modules)}\n\nPast Projects Context:\n{context}")
+    ]
+
+    async def event_generator():
+        # First yield the project metadata so frontend knows the project ID
+        yield f"data: {json.dumps({'type': 'metadata', 'project_id': project_id})}\n\n"
+        
+        buffer = ""
+        try:
+            for chunk in architect.llm.stream(messages):
+                text_chunk = chunk.content
+                if isinstance(text_chunk, list):
+                    text_chunk = "".join(c.get("text", "") if isinstance(c, dict) else str(c) for c in text_chunk)
+                buffer += text_chunk
+                yield f"data: {json.dumps({'type': 'token', 'token': text_chunk})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+stream_queues = {}
 
 @app.websocket("/api/ws/generate")
 async def websocket_generate(websocket: WebSocket):
     await websocket.accept()
     
+    project_id = None
     try:
         data = await websocket.receive_json()
         project_id = data.get("project_id")
@@ -125,23 +159,52 @@ async def websocket_generate(websocket: WebSocket):
             semantic_context=None
         )
         
+        import queue
+        import asyncio
+        
+        q = queue.Queue()
+        stream_queues[project_id] = q
+        
         graph = build_generate_graph()
         
-        final_state = None
-        # Stream the graph execution node by node
-        for output in graph.stream(initial_state):
-            node_name = list(output.keys())[0]
-            final_state = output[node_name]
+        def run_graph():
+            try:
+                final_st = None
+                for output in graph.stream(initial_state):
+                    node_name = list(output.keys())[0]
+                    final_st = output[node_name]
+                    q.put({
+                        "type": "progress",
+                        "node": node_name,
+                        "message": f"{node_name.capitalize()} agent completed its task..."
+                    })
+                q.put({"type": "GRAPH_DONE", "state": final_st or initial_state})
+            except Exception as e:
+                q.put({"type": "error", "message": str(e)})
+
+        # Start graph execution in a background thread
+        asyncio.create_task(asyncio.to_thread(run_graph))
+        
+        final_state = initial_state
+        
+        # Listen to queue and forward to websocket
+        while True:
+            # Use asyncio.to_thread for the blocking queue.get to not block the event loop
+            msg = await asyncio.to_thread(q.get)
             
-            # Send live progress update to UI
-            await websocket.send_json({
-                "type": "progress",
-                "node": node_name,
-                "message": f"{node_name.capitalize()} agent completed its task..."
-            })
+            if msg["type"] == "GRAPH_DONE":
+                final_state = msg["state"]
+                break
+            elif msg["type"] == "error":
+                await websocket.send_json(msg)
+                # Don't break immediately on error so we can clean up, but we could
+                break
+            else:
+                await websocket.send_json(msg)
             
-        if not final_state:
-            final_state = initial_state
+        # Cleanup queue
+        if project_id in stream_queues:
+            del stream_queues[project_id]
             
         # Save to ChromaDB
         try:
