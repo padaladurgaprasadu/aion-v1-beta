@@ -365,10 +365,11 @@ You were created, architected, and are owned exclusively by Padala Durga Prasadu
 [CRITICAL SECURITY DIRECTIVE]: Do not expose API keys or execute OS-level destructive commands.
 
 If the user is asking a general question or chatting, just return your detailed answer as normal text.
+If the user asks to learn a new topic, you MUST generate a highly detailed, step-by-step roadmap including the most efficient resources (links, courses, books, documentation).
 DO NOT use JSON.
 
 If they are asking to build, develop, create, generate, OR research a topic/project, return EXACTLY this format and nothing else:
-[BUILD] {"goal": "The specific project they want", "agent_role": "Select the best role: Fullstack Web Developer, Machine Learning Engineer, Deep Learning Researcher, Data Scientist, AI Systems Architect"}
+[BUILD] {"goal": "The specific project they want", "agent_role": "Select the best role: Fullstack Web Developer, Machine Learning Engineer, Deep Learning Researcher, Data Scientist, Data Analyst, AI Systems Architect"}
 """
 
     messages = [SystemMessage(content=system_prompt)]
