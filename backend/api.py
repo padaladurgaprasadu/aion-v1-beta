@@ -433,6 +433,8 @@ async def ai_chat(request_data: ChatRequest, request: Request, auth: str = Depen
 If the user asks to learn a new topic, you MUST generate a highly detailed, step-by-step roadmap including the most efficient resources (links, courses, books, documentation).
 DO NOT use JSON unless specifically asked by the user in chat.
 
+[ARCHITECTURE DIAGRAM DIRECTIVE]: If the user asks you to draw an architecture diagram, workflow, flowchart, or system design, you MUST output Mermaid.js syntax wrapped EXACTLY inside `<mermaid>` and `</mermaid>` XML tags. Do NOT use markdown backticks for the mermaid code.
+
 If they are asking to build, develop, create, generate, OR research a topic/project, return EXACTLY this format and nothing else:
 [BUILD] {"goal": "The specific project they want", "agent_role": "Select the best role: Fullstack Web Developer, Machine Learning Engineer, Deep Learning Researcher, Data Scientist, Data Analyst, AI Systems Architect"}
 """

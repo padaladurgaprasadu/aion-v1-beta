@@ -1,7 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import Auth from './components/Auth'
+import Mermaid from './Mermaid'
 import { supabase } from './lib/supabaseClient'
+
+const renderMessageContent = (content) => {
+  if (!content.includes('<mermaid>')) return content;
+  
+  const parts = content.split(/(<mermaid>[\s\S]*?<\/mermaid>)/);
+  return parts.map((part, i) => {
+      if (part.startsWith('<mermaid>') && part.endsWith('</mermaid>')) {
+          const chart = part.replace('<mermaid>', '').replace('</mermaid>', '').trim();
+          return <Mermaid key={i} chart={chart} />;
+      }
+      return <span key={i}>{part}</span>;
+  });
+};
 
 function App() {
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -435,7 +449,7 @@ function App() {
                     whiteSpace: 'pre-wrap',
                     position: 'relative'
                   }}>
-                    {msg.content}
+                    {renderMessageContent(msg.content)}
                     {msg.role === 'ai' && (
                       <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                         <button 
