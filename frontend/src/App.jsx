@@ -5,12 +5,13 @@ import Mermaid from './Mermaid'
 import { supabase } from './lib/supabaseClient'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 
 const renderMessageContent = (content) => {
   if (!content.includes('<mermaid>')) {
       return (
           <div className="markdown-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{content}</ReactMarkdown>
           </div>
       );
   }
@@ -23,7 +24,7 @@ const renderMessageContent = (content) => {
       }
       return (
           <div key={i} className="markdown-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{part}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{part}</ReactMarkdown>
           </div>
       );
   });
