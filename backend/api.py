@@ -30,28 +30,39 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 import jwt
 
+import jwt
+from jwt import PyJWKClient
+
 def verify_token(authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Unauthorized: Missing Bearer Token.")
     
     token = authorization.split(" ")[1]
     
-    # If no JWT secret is provided in .env, we assume local development mode 
-    # but still require a non-empty token format to prevent unauthenticated access.
     jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
-    if not jwt_secret:
+    supabase_url = os.getenv("SUPABASE_URL")
+    
+    # If no keys are provided, we assume local development mode 
+    if not jwt_secret and not supabase_url:
         if len(token) < 10:
             raise HTTPException(status_code=401, detail="Unauthorized: Invalid Token.")
         return token
         
     try:
-        # Supabase signs with HS256 and the audience is usually 'authenticated'
-        decoded = jwt.decode(token, jwt_secret, algorithms=["HS256"], options={"verify_aud": False})
-        return decoded
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Unauthorized: Token has expired.")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Unauthorized: Invalid Token signature.")
+        # If they use a modern Supabase project with ECC/RS256 keys, fetch the JWKS
+        if supabase_url:
+            jwks_url = f"{supabase_url}/auth/v1/jwks"
+            jwks_client = PyJWKClient(jwks_url)
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+            decoded = jwt.decode(token, signing_key.key, algorithms=["RS256", "ES256", "HS256"], options={"verify_aud": False})
+            return decoded
+        else:
+            # Fallback to legacy HS256 string secret
+            decoded = jwt.decode(token, jwt_secret, algorithms=["HS256"], options={"verify_aud": False})
+            return decoded
+            
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Unauthorized: Token validation failed. {str(e)}")
 
 # Setup CORS for the React frontend
 frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
