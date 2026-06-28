@@ -520,6 +520,9 @@ function App() {
               </div>
             ))}
           </div>
+            <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>
+              AiON v1.0.1
+            </div>
         </aside>
 
         {/* CHAT SECTION (Centers when step=1, shrinks to 30% when step>1) */}
