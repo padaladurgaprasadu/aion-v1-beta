@@ -491,6 +491,7 @@ async def stop_preview(project_id: str):
 class ChatRequest(BaseModel):
     message: str
     history: list = []
+    image: str = None
 
 @app.post("/api/chat")
 @limiter.limit("20/minute")
@@ -595,7 +596,13 @@ If they are asking to build, develop, create, generate, OR research a topic/proj
         elif role == "ai" and not content.startswith("[BUILD]"):
             messages.append(AIMessage(content=content))
             
-    messages.append(HumanMessage(content=sanitized_message))
+    if request_data.image:
+        messages.append(HumanMessage(content=[
+            {"type": "text", "text": sanitized_message},
+            {"type": "image_url", "image_url": {"url": request_data.image}}
+        ]))
+    else:
+        messages.append(HumanMessage(content=sanitized_message))
 
     async def event_generator():
         try:

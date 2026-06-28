@@ -84,6 +84,8 @@ function App() {
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState([])
   const [isChatLoading, setIsChatLoading] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null)
+  const fileInputRef = useRef(null)
   
   // Sidebar History state
   const [chatHistoryList, setChatHistoryList] = useState([])
@@ -196,6 +198,17 @@ function App() {
     setFeedbackState(prev => ({ ...prev, [idx]: type }))
   }
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
   const startVoiceRecognition = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -221,11 +234,18 @@ function App() {
 
   const handleChatSubmit = async (e) => {
     e.preventDefault()
-    if (!chatInput.trim()) return
+    if (!chatInput.trim() && !selectedImage) return
 
     const userMessage = chatInput
-    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    const imagePayload = selectedImage
+    
+    // Add User message immediately
+    const userMsgObj = { role: 'user', content: userMessage };
+    if (imagePayload) userMsgObj.image = imagePayload;
+    
+    setChatMessages(prev => [...prev, userMsgObj])
     setChatInput('')
+    setSelectedImage(null)
     setIsChatLoading(true)
     
     // Add an empty AI message that we will stream into
@@ -238,7 +258,7 @@ function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token || 'mock-token-for-local-dev'}`
         },
-        body: JSON.stringify({ message: userMessage, history: chatMessages })
+        body: JSON.stringify({ message: userMessage, history: chatMessages, image: imagePayload })
       })
       
       setIsChatLoading(false) // Stop the spinner once stream starts
@@ -609,6 +629,11 @@ function App() {
                     color: '#e0e0e0',
                     position: 'relative'
                   }}>
+                    {msg.image && (
+                      <div style={{ marginBottom: '10px' }}>
+                        <img src={msg.image} alt="Uploaded" style={{ maxWidth: '300px', maxHeight: '300px', borderRadius: '8px', border: '1px solid #444', objectFit: 'contain' }} />
+                      </div>
+                    )}
                     {renderMessageContent(msg.content)}
                     {msg.role === 'ai' && (
                       <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
@@ -674,9 +699,30 @@ function App() {
             left: '0', 
             right: '0', 
             display: 'flex', 
-            justifyContent: 'center',
+            flexDirection: 'column',
+            alignItems: 'center',
             padding: '0 20px'
           }}>
+            {/* Image Preview Thumbnail */}
+            {selectedImage && (
+              <div style={{
+                position: 'relative',
+                marginBottom: '10px',
+                width: '100%',
+                maxWidth: '800px',
+                display: 'flex'
+              }}>
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <img src={selectedImage} alt="Upload preview" style={{ height: '60px', borderRadius: '8px', border: '2px solid #444', objectFit: 'cover' }} />
+                  <button 
+                    type="button"
+                    onClick={() => setSelectedImage(null)} 
+                    style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.3)' }}
+                  >×</button>
+                </div>
+              </div>
+            )}
+            
             <form onSubmit={handleChatSubmit} style={{ 
               width: '100%', 
               maxWidth: '800px', 
@@ -688,6 +734,28 @@ function App() {
               border: '1px solid #333',
               boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
             }}>
+              <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} style={{ display: 'none' }} />
+              <button 
+                type="button" 
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  background: 'none', 
+                  border: 'none', 
+                  color: '#888',
+                  fontSize: '1.4rem', 
+                  cursor: 'pointer', 
+                  padding: '0 12px', 
+                  transition: 'color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                title="Attach Image"
+                onMouseEnter={(e) => e.target.style.color = '#fff'}
+                onMouseLeave={(e) => e.target.style.color = '#888'}
+              >
+                +
+              </button>
               <input 
                 type="text" 
                 value={chatInput} 
