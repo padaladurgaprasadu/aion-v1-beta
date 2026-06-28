@@ -12,6 +12,26 @@ marked.setOptions({
   gfm: true
 })
 
+const renderer = new marked.Renderer();
+renderer.code = function(code, language) {
+  // Use a regex to safely escape characters for the onclick attribute
+  const safeCodeForAttr = code.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '');
+  const safeCodeForDisplay = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  
+  return `
+    <div class="code-block-wrapper" style="position: relative; margin: 1em 0; border-radius: 8px; overflow: hidden; border: 1px solid #333;">
+      <div style="background: #1e1e1e; padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; color: #888; font-size: 0.75rem; font-family: monospace;">
+        <span>${language || 'text'}</span>
+        <div style="display: flex; gap: 12px;">
+          <button onclick="navigator.clipboard.writeText('${safeCodeForAttr}'); this.innerText='Copied!'; setTimeout(() => this.innerText='Copy', 2000)" style="background: none; border: none; color: #aaa; cursor: pointer; font-size: 0.75rem; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#aaa'">Copy</button>
+        </div>
+      </div>
+      <pre style="margin: 0; border-radius: 0; padding: 16px; background: #0d0d0d; overflow-x: auto;"><code class="language-${language}">${safeCodeForDisplay}</code></pre>
+    </div>
+  `;
+};
+marked.use({ renderer });
+
 const renderMessageContent = (content) => {
   if (!content.includes('<mermaid>')) {
       const htmlContent = DOMPurify.sanitize(marked.parse(content));
@@ -553,6 +573,9 @@ function App() {
           <h1 style={{ margin: 0, fontSize: '1.2rem', letterSpacing: '1px', fontWeight: '600' }}>AiON</h1>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={() => alert("Settings modal coming soon!")} style={{ padding: '8px 16px', fontSize: '0.85rem', backgroundColor: 'transparent', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s', display: 'flex', alignItems: 'center', gap: '6px' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#2a2a2a'} onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
+            ⚙️ Settings
+          </button>
           <button onClick={() => supabase.auth.signOut()} style={{ padding: '8px 16px', fontSize: '0.85rem', backgroundColor: '#2a2a2a', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#3a3a3a'} onMouseLeave={(e) => e.target.style.backgroundColor = '#2a2a2a'}>
             Sign Out
           </button>
@@ -619,9 +642,10 @@ function App() {
                   <div style={{ 
                     width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
                     backgroundColor: msg.role === 'user' ? '#333' : 'var(--accent)',
-                    display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px'
+                    display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px',
+                    textTransform: 'uppercase'
                   }}>
-                    {msg.role === 'user' ? 'U' : 'A'}
+                    {msg.role === 'user' ? (session?.user?.email?.[0] || 'U') : 'A'}
                   </div>
                   <div style={{ 
                     backgroundColor: msg.role === 'user' ? '#2a2a2a' : 'transparent',
