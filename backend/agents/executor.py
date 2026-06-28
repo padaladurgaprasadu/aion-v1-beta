@@ -216,11 +216,21 @@ class ExecutorAgent(BaseAgent):
         # This will perfectly inject the AI's App.jsx and components into the Vite template!
         if state.get("code_files"):
             for path, content in state["code_files"].items():
-                full_path = os.path.join(target_dir, path.replace("/", os.sep))
+                # [SECURITY] Prevent path traversal attacks (e.g. ../../etc/passwd)
+                safe_path = path.replace("..", "").replace(":\\", "").lstrip("/")
+                full_path = os.path.abspath(os.path.join(target_dir, safe_path.replace("/", os.sep)))
+                
+                # Double check that the absolute path is still within the target directory
+                if not full_path.startswith(os.path.abspath(target_dir)):
+                    error_msg = f"[SECURITY BREACH] Path traversal attempt detected: {path}. Execution aborted."
+                    print(f"   -> {error_msg}")
+                    state["runtime_error"] = error_msg
+                    state["execution_logs"] = execution_logs + [f"> {error_msg}"]
+                    return state
+
                 os.makedirs(os.path.dirname(full_path), exist_ok=True)
                 with open(full_path, "w", encoding="utf-8") as f:
                     f.write(content)
-                    
         # [SECURITY] PRE-EXECUTION SECURITY SCANNER
         dangerous_keywords = ["rm -rf", "del /s", "format c:", "os.system(", "subprocess.run(", "fs.unlink"]
         if state.get("code_files"):

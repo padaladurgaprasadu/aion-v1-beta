@@ -28,15 +28,36 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+import jwt
+
 def verify_token(authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Unauthorized: Missing Bearer Token. Ensure you are logged into Supabase.")
-    return authorization
+        raise HTTPException(status_code=401, detail="Unauthorized: Missing Bearer Token.")
+    
+    token = authorization.split(" ")[1]
+    
+    # If no JWT secret is provided in .env, we assume local development mode 
+    # but still require a non-empty token format to prevent unauthenticated access.
+    jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
+    if not jwt_secret:
+        if len(token) < 10:
+            raise HTTPException(status_code=401, detail="Unauthorized: Invalid Token.")
+        return token
+        
+    try:
+        # Supabase signs with HS256 and the audience is usually 'authenticated'
+        decoded = jwt.decode(token, jwt_secret, algorithms=["HS256"], options={"verify_aud": False})
+        return decoded
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Unauthorized: Token has expired.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid Token signature.")
 
 # Setup CORS for the React frontend
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all origins for local development
+    allow_origins=[frontend_url], # STRICT CORS POLICY
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -121,7 +142,9 @@ async def plan_project(request_data: PlanRequest, request: Request, auth: str = 
                 buffer += text_chunk
                 yield f"data: {json.dumps({'type': 'token', 'token': text_chunk})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            # Obfuscate internal error
+            print(f"[Error in Architect stream]: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Internal Server Error.'})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -188,7 +211,8 @@ async def websocket_generate(websocket: WebSocket):
                 else:
                     q.put({"type": "GRAPH_DONE", "state": final_st or initial_state})
             except Exception as e:
-                q.put({"type": "error", "message": str(e)})
+                print(f"[Error in Graph execution]: {e}")
+                q.put({"type": "error", "message": "Internal Server Error."})
 
         # Start graph execution in a background thread
         asyncio.create_task(asyncio.to_thread(run_graph))
@@ -262,7 +286,8 @@ async def resume_generation(req: ResumeRequest, auth: str = Depends(verify_token
                 })
             q.put({"type": "GRAPH_DONE", "state": final_st})
         except Exception as e:
-            q.put({"type": "error", "message": str(e)})
+            print(f"[Error in Resume Execution]: {e}")
+            q.put({"type": "error", "message": "Internal Server Error."})
             
     import asyncio
     asyncio.create_task(asyncio.to_thread(resume_graph))
@@ -647,7 +672,8 @@ class ExecuteRequest(BaseModel):
     auto_approve: bool = False # If true, bypasses human-in-the-loop
 
 @app.post("/api/v1/agents/execute")
-async def api_execute_agent(req: ExecuteRequest, auth: str = Depends(verify_token)):
+@limiter.limit("5/minute")
+async def api_execute_agent(req: ExecuteRequest, request: Request, auth: str = Depends(verify_token)):
     """
     Enterprise API for programmatically triggering AiON workflows.
     Great for CI/CD integrations or custom backend automations.
