@@ -6,6 +6,55 @@ import { supabase } from './lib/supabaseClient'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
+const handleMarkdownClick = async (e) => {
+  const target = e.target;
+  if (target.classList.contains('copy-code-btn')) {
+    const code = decodeURIComponent(target.getAttribute('data-code'));
+    navigator.clipboard.writeText(code);
+    target.innerText = 'Copied!';
+    setTimeout(() => { target.innerText = 'Copy'; }, 2000);
+  } else if (target.classList.contains('run-code-btn')) {
+    const code = decodeURIComponent(target.getAttribute('data-code'));
+    const lang = target.getAttribute('data-lang');
+    const blockId = target.getAttribute('data-block-id');
+    const outputDiv = document.getElementById(`sandbox-${blockId}`);
+    
+    if (!outputDiv) return;
+    
+    outputDiv.style.display = 'block';
+    outputDiv.innerHTML = '<div style="padding: 12px; color: #888; font-family: monospace; font-size: 0.85rem;">Running...</div>';
+    target.innerText = 'Running...';
+    target.style.color = '#888';
+    target.disabled = true;
+    
+    // Map languages for Piston API
+    let pistonLang = lang;
+    if (lang === 'js' || lang === 'node') pistonLang = 'javascript';
+    if (lang === 'py') pistonLang = 'python';
+    
+    try {
+      const res = await fetch('https://emkc.org/api/v2/piston/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: pistonLang,
+          version: '*',
+          files: [{ content: code }]
+        })
+      });
+      const data = await res.json();
+      const output = data.run?.output || data.message || "No output returned.";
+      outputDiv.innerHTML = `<pre style="margin:0; padding:12px; background:#050505; color:#4ade80; font-family:monospace; font-size:0.85rem; overflow-x:auto;">${output.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
+    } catch (err) {
+      outputDiv.innerHTML = `<div style="padding: 12px; color: #ef4444; font-family: monospace; font-size: 0.85rem;">Error: ${err.message}</div>`;
+    } finally {
+      target.innerText = 'Run';
+      target.style.color = '#4ade80';
+      target.disabled = false;
+    }
+  }
+};
+
 // Configure marked to use breaks
 marked.setOptions({
   breaks: true,
@@ -16,19 +65,26 @@ marked.use({
   renderer: {
     code({ text, lang }) {
       const language = lang || 'text';
-      // Use a regex to safely escape characters for the onclick attribute
-      const safeCodeForAttr = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '');
       const safeCodeForDisplay = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const encodedCode = encodeURIComponent(text);
+      const blockId = Math.random().toString(36).substring(2, 9);
       
+      const supportedRunLangs = ['python', 'py', 'javascript', 'js', 'node'];
+      const runBtnHTML = supportedRunLangs.includes(language.toLowerCase()) 
+        ? `<button class="run-code-btn" data-code="${encodedCode}" data-lang="${language}" data-block-id="${blockId}" style="background: none; border: none; color: #4ade80; cursor: pointer; font-size: 0.75rem; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#4ade80'">Run</button>`
+        : '';
+        
       return `
         <div class="code-block-wrapper" style="position: relative; margin: 1em 0; border-radius: 8px; overflow: hidden; border: 1px solid #333;">
           <div style="background: #1e1e1e; padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; color: #888; font-size: 0.75rem; font-family: monospace;">
             <span>${language}</span>
-            <div style="display: flex; gap: 12px;">
-              <button onclick="navigator.clipboard.writeText('${safeCodeForAttr}'); this.innerText='Copied!'; setTimeout(() => this.innerText='Copy', 2000)" style="background: none; border: none; color: #aaa; cursor: pointer; font-size: 0.75rem; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#aaa'">Copy</button>
+            <div style="display: flex; gap: 16px;">
+              ${runBtnHTML}
+              <button class="copy-code-btn" data-code="${encodedCode}" style="background: none; border: none; color: #aaa; cursor: pointer; font-size: 0.75rem; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#aaa'">Copy</button>
             </div>
           </div>
           <pre style="margin: 0; border-radius: 0; padding: 16px; background: #0d0d0d; overflow-x: auto;"><code class="language-${language}">${safeCodeForDisplay}</code></pre>
+          <div id="sandbox-${blockId}" style="display: none; border-top: 1px dashed #333; background: #050505;"></div>
         </div>
       `;
     }
@@ -39,7 +95,7 @@ const renderMessageContent = (content) => {
   if (!content.includes('<mermaid>')) {
       const htmlContent = DOMPurify.sanitize(marked.parse(content));
       return (
-          <div className="markdown-body" dangerouslySetInnerHTML={{ __html: htmlContent }} />
+          <div className="markdown-body" onClick={handleMarkdownClick} dangerouslySetInnerHTML={{ __html: htmlContent }} />
       );
   }
   
@@ -56,7 +112,7 @@ const renderMessageContent = (content) => {
       }
       const htmlContent = DOMPurify.sanitize(marked.parse(part));
       return (
-          <div key={i} className="markdown-body" dangerouslySetInnerHTML={{ __html: htmlContent }} />
+          <div key={i} className="markdown-body" onClick={handleMarkdownClick} dangerouslySetInnerHTML={{ __html: htmlContent }} />
       );
   });
 };
@@ -107,6 +163,7 @@ function App() {
   
   // Phase 3 additions
   const [showDevModal, setShowDevModal] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   // Chat state
   const [chatInput, setChatInput] = useState('')
@@ -576,7 +633,7 @@ function App() {
           <h1 style={{ margin: 0, fontSize: '1.2rem', letterSpacing: '1px', fontWeight: '600' }}>AiON</h1>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={() => alert("Settings modal coming soon!")} style={{ padding: '8px 16px', fontSize: '0.85rem', backgroundColor: 'transparent', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s', display: 'flex', alignItems: 'center', gap: '6px' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#2a2a2a'} onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
+          <button onClick={() => setShowSettingsModal(true)} style={{ padding: '8px 16px', fontSize: '0.85rem', backgroundColor: 'transparent', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s', display: 'flex', alignItems: 'center', gap: '6px' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#2a2a2a'} onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
             ⚙️ Settings
           </button>
           <button onClick={() => supabase.auth.signOut()} style={{ padding: '8px 16px', fontSize: '0.85rem', backgroundColor: '#2a2a2a', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#3a3a3a'} onMouseLeave={(e) => e.target.style.backgroundColor = '#2a2a2a'}>
@@ -1000,6 +1057,37 @@ function App() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        
+        {/* SETTINGS MODAL */}
+        {showSettingsModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
+            <div style={{ backgroundColor: '#1a1a1a', padding: '30px', borderRadius: '16px', width: '90%', maxWidth: '400px', border: '1px solid #333', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+              <h2 style={{ margin: '0 0 20px 0', fontSize: '1.5rem', fontWeight: '600' }}>Settings</h2>
+              
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', color: '#888', marginBottom: '8px', fontSize: '0.9rem' }}>Account Email</label>
+                <div style={{ padding: '12px', backgroundColor: '#0d0d0d', border: '1px solid #333', borderRadius: '8px', color: '#ccc' }}>
+                  {session?.user?.email}
+                </div>
+              </div>
+              
+              <div style={{ marginBottom: '30px' }}>
+                <label style={{ display: 'block', color: '#888', marginBottom: '8px', fontSize: '0.9rem' }}>Theme</label>
+                <select style={{ width: '100%', padding: '12px', backgroundColor: '#0d0d0d', border: '1px solid #333', borderRadius: '8px', color: '#ccc', appearance: 'none', cursor: 'pointer' }}>
+                  <option>Dark (Default)</option>
+                  <option>Light</option>
+                  <option>System</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button onClick={() => setShowSettingsModal(false)} style={{ padding: '10px 20px', backgroundColor: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  Save & Close
+                </button>
+              </div>
             </div>
           </div>
         )}
