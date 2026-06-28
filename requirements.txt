@@ -11,3 +11,4 @@ langchain-ollama
 ollama
 slowapi
 langchain-openai
+duckduckgo-search

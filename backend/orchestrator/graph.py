@@ -8,6 +8,7 @@ from backend.agents.executor import ExecutorAgent
 from backend.agents.devops import DevOpsAgent
 from backend.agents.ml_trainer import AIMLModelTrainingAgent
 from backend.agents.hyperparameter_tuner import AutoHyperparameterTuningAgent
+from backend.agents.researcher import ResearchAgent
 
 def should_continue(state: AiONState):
     """
@@ -57,7 +58,10 @@ def build_graph():
     ml_trainer = AIMLModelTrainingAgent()
     hp_tuner = AutoHyperparameterTuningAgent()
 
+    researcher = ResearchAgent()
+
     workflow.add_node("planner", planner.run)
+    workflow.add_node("researcher", researcher.run)
     workflow.add_node("architect", architect.run)
     workflow.add_node("coder", coder.run)
     workflow.add_node("ml_trainer", ml_trainer.run)
@@ -67,7 +71,8 @@ def build_graph():
     workflow.add_node("executor", executor.run)
 
     workflow.set_entry_point("planner")
-    workflow.add_edge("planner", "architect")
+    workflow.add_edge("planner", "researcher")
+    workflow.add_edge("researcher", "architect")
     workflow.add_edge("architect", "coder")
     
     workflow.add_edge("coder", "ml_trainer")
@@ -81,17 +86,20 @@ def build_graph():
 
 def build_plan_graph():
     """
-    Builds the first half of the graph (Phase 4): Planner -> Architect -> END
+    Builds the first half of the graph (Phase 4): Planner -> Researcher -> Architect -> END
     """
     workflow = StateGraph(AiONState)
     planner = PlannerAgent()
+    researcher = ResearchAgent()
     architect = ArchitectAgent()
     
     workflow.add_node("planner", planner.run)
+    workflow.add_node("researcher", researcher.run)
     workflow.add_node("architect", architect.run)
     
     workflow.set_entry_point("planner")
-    workflow.add_edge("planner", "architect")
+    workflow.add_edge("planner", "researcher")
+    workflow.add_edge("researcher", "architect")
     workflow.add_edge("architect", END)
     
     return workflow.compile()

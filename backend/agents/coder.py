@@ -71,13 +71,38 @@ class CoderAgent(BaseAgent):
         # For simplicity, we just regenerate all or use the target files.
         files_to_generate = state["blueprint"].get("file_structure", ["src/server.js", "package.json"])
         
-        print(f"[Coder] Generating {len(files_to_generate)} files sequentially (Streaming)...")
-        
         blueprint_str = json.dumps(state["blueprint"])
         feedback = state.get("review_feedback", "None")
         runtime_error = state.get("runtime_error", "None")
         
-        code_files = {}
+        # --- NEXT-GEN AUTO-HEALING DIAGNOSTIC ---
+        if runtime_error != "None" or feedback != "None":
+            print(f"[Coder] Next-Gen Auto-Healing: Diagnosing failing files...")
+            diagnostic_prompt = ChatPromptTemplate.from_messages([
+                ("system", "You are an elite debugging AI. Given a list of files in the project, and a runtime error or review feedback, identify exactly which files need to be modified to fix the issue. Output EXACTLY a JSON list of strings (the exact file paths from the provided list) and nothing else."),
+                ("human", "Project Files: {files}\nRuntime Error: {error}\nReview Feedback: {feedback}")
+            ])
+            try:
+                diag_chain = diagnostic_prompt | self.llm
+                res = diag_chain.invoke({
+                    "files": json.dumps(files_to_generate),
+                    "error": runtime_error,
+                    "feedback": feedback
+                })
+                content = res.content.replace("```json", "").replace("```", "").strip()
+                files_to_fix = json.loads(content)
+                if isinstance(files_to_fix, list) and len(files_to_fix) > 0:
+                    files_to_generate = [f for f in files_to_fix if f in files_to_generate]
+                    if not files_to_generate: # Fallback if hallucinated
+                        files_to_generate = state["blueprint"].get("file_structure", [])
+            except Exception as e:
+                print(f"   -> [Coder] Diagnostic failed: {e}. Falling back to full regeneration.")
+        # ----------------------------------------
+        
+        print(f"[Coder] Generating {len(files_to_generate)} files sequentially (Streaming)...")
+        
+        # PRESERVE EXISTING FILES during auto-healing
+        code_files = state.get("code_files", {}).copy()
         
         agent_role = state.get("agent_role", "Fullstack Web Developer")
         semantic_context = state.get("semantic_context", "No semantic context provided.")
