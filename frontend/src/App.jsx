@@ -136,17 +136,22 @@ function App() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       
+      let buffer = "";
+
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
         
-        for (const line of lines) {
-            if (line.startsWith('data: ')) {
+        // Keep the last incomplete part in the buffer
+        buffer = parts.pop();
+        
+        for (const part of parts) {
+            if (part.startsWith('data: ')) {
                 try {
-                    const data = JSON.parse(line.slice(6));
+                    const data = JSON.parse(part.slice(6));
                     if (data.type === 'chat') {
                         // Append token to the last AI message
                         setChatMessages(prev => {
@@ -166,7 +171,7 @@ function App() {
                         handlePlan(data.data.goal, data.data.agent_role);
                     }
                 } catch (e) {
-                    console.error("Error parsing stream line:", line);
+                    console.error("Error parsing stream line:", part);
                 }
             }
         }
@@ -217,18 +222,22 @@ function App() {
       const decoder = new TextDecoder("utf-8");
       
       let fullBlueprint = "";
+      let buffer = "";
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
         
-        for (const line of lines) {
-            if (line.startsWith('data: ')) {
+        // Keep the last incomplete part in the buffer
+        buffer = parts.pop();
+        
+        for (const part of parts) {
+            if (part.startsWith('data: ')) {
                 try {
-                    const data = JSON.parse(line.slice(6));
+                    const data = JSON.parse(part.slice(6));
                     if (data.type === 'metadata') {
                         setProjectId(data.project_id);
                     } else if (data.type === 'token') {
@@ -238,7 +247,7 @@ function App() {
                         setError(data.message);
                     }
                 } catch (e) {
-                    console.error("Error parsing stream line:", line);
+                    console.error("Error parsing stream line:", part);
                 }
             }
         }
