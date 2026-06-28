@@ -4,6 +4,9 @@ from backend.agents.base import BaseAgent
 from backend.orchestrator.state import AiONState
 from backend.memory.neo4j_client import Neo4jClient
 from backend.memory.chroma_client import ChromaClient
+from backend.utils.logger import get_logger, measure_time
+
+logger = get_logger(__name__)
 
 class ArchitectAgent(BaseAgent):
     """
@@ -14,9 +17,10 @@ class ArchitectAgent(BaseAgent):
         super().__init__()
         # We will build the prompt dynamically in the run method to access state
 
+    @measure_time(logger)
     def run(self, state: AiONState) -> AiONState:
         agent_role = state.get("agent_role", "Fullstack Web Developer")
-        print(f"[Architect] Designing system architecture for role: {agent_role}...")
+        logger.info(f"[Architect] Designing system architecture for role: {agent_role}...")
         
         # Dynamically define architectural rules based on role
         if "Research" in agent_role:

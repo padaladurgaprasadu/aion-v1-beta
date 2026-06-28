@@ -4,6 +4,10 @@ import concurrent.futures
 from langchain_core.prompts import ChatPromptTemplate
 from backend.agents.base import BaseAgent
 from backend.orchestrator.state import AiONState
+from backend.utils.logger import get_logger, measure_time
+import ast
+
+logger = get_logger(__name__)
 
 class CoderAgent(BaseAgent):
     """
@@ -66,7 +70,8 @@ class CoderAgent(BaseAgent):
                     print(f"      - [ERROR] Exception while generating {target_file}: {e}")
                     return target_file, f"// Error: AiON encountered an exception: {e}"
 
-    def run(self, state: AiONState) -> AiONState:
+    @measure_time(logger)
+    def run(self, state: AiONState, q=None) -> AiONState:
         # If we already have code files (e.g. from Reviewer loop), we might only regenerate the ones with issues.
         # For simplicity, we just regenerate all or use the target files.
         files_to_generate = state["blueprint"].get("file_structure", ["src/server.js", "package.json"])
@@ -181,7 +186,12 @@ class CoderAgent(BaseAgent):
                     match = re.search(r'<file\s+path="[^"]+">(.*?)</file>', full_content, re.DOTALL)
                     if match:
                         code = match.group(1).strip()
-                        print(f"   -> [Success] Generated {target_file}")
+                        
+                        # CODE VALIDATION GATE
+                        if target_file.endswith(".py"):
+                            ast.parse(code) # Raises SyntaxError if code is fundamentally malformed
+                            
+                        logger.info(f"   -> [Success] Generated {target_file}")
                         code_files[target_file] = code
                         break
                     else:

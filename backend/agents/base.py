@@ -2,6 +2,10 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+from tenacity import retry, stop_after_attempt, wait_exponential
+from backend.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -10,6 +14,18 @@ class BaseAgent:
     """
     A base class that sets up the AI model (LLM) so all other agents can inherit it.
     """
+    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=30), reraise=True)
+    def invoke_with_retry(self, chain, inputs):
+        """
+        Executes a LangChain invocation with robust exponential backoff retries.
+        Automatically handles rate limits (429) and server errors (500, 502).
+        """
+        try:
+            return chain.invoke(inputs)
+        except Exception as e:
+            logger.warning(f"[RETRY] LLM call failed with error: {e}. Retrying with exponential backoff...")
+            raise e
+
     def __init__(self, model_name="google/gemini-2.5-flash", temperature=0.2):
         self.model_name = model_name
         self.temperature = temperature
