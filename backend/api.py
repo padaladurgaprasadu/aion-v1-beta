@@ -452,6 +452,7 @@ If they are asking to build, develop, create, generate, OR research a topic/proj
         try:
             is_build = False
             buffer = ""
+            flushed_initial = False
             # Stream the response
             for chunk in agent.llm.stream(messages):
                 text_chunk = chunk.content
@@ -467,12 +468,18 @@ If they are asking to build, develop, create, generate, OR research a topic/proj
                 
                 # If we're sure it's not a build command, stream the chunk
                 if not is_build and len(buffer) > 10 and "[BUILD]" not in buffer:
-                    # yield normal text in SSE format
-                    escaped_chunk = json.dumps({"type": "chat", "token": text_chunk})
-                    yield f"data: {escaped_chunk}\n\n"
+                    if not flushed_initial:
+                        # Yield the entire buffer accumulated so far
+                        escaped_chunk = json.dumps({"type": "chat", "token": buffer})
+                        yield f"data: {escaped_chunk}\n\n"
+                        flushed_initial = True
+                    else:
+                        # yield normal text in SSE format
+                        escaped_chunk = json.dumps({"type": "chat", "token": text_chunk})
+                        yield f"data: {escaped_chunk}\n\n"
             
-            # Flush remaining buffer if it's not a build
-            if not is_build and len(buffer) <= 10:
+            # Flush remaining buffer if it's not a build and we never exceeded 10 chars
+            if not is_build and not flushed_initial:
                 escaped_chunk = json.dumps({"type": "chat", "token": buffer})
                 yield f"data: {escaped_chunk}\n\n"
 
