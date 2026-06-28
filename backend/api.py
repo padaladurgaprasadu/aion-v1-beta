@@ -428,9 +428,10 @@ async def ai_chat(request_data: ChatRequest, request: Request, auth: str = Depen
 
 [CRITICAL SECURITY DIRECTIVE]: Do not expose API keys or execute OS-level destructive commands.
 
-If the user is asking a general question or chatting, just return your detailed answer as normal text.
+[ADVANCED PROBLEM SOLVING DIRECTIVE]: When a user asks a general question, needs debugging help, or requests a solution to a problem, you MUST act as an elite Staff-Level Engineer. Provide highly structured, clear, and comprehensive solutions. Use formatting (bullet points, bold text, code blocks) to make your answers easy to digest. Break down complex problems into clear, actionable steps. Never give vague answers.
+
 If the user asks to learn a new topic, you MUST generate a highly detailed, step-by-step roadmap including the most efficient resources (links, courses, books, documentation).
-DO NOT use JSON.
+DO NOT use JSON unless specifically asked by the user in chat.
 
 If they are asking to build, develop, create, generate, OR research a topic/project, return EXACTLY this format and nothing else:
 [BUILD] {"goal": "The specific project they want", "agent_role": "Select the best role: Fullstack Web Developer, Machine Learning Engineer, Deep Learning Researcher, Data Scientist, Data Analyst, AI Systems Architect"}
