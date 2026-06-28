@@ -8,7 +8,11 @@ import remarkGfm from 'remark-gfm'
 
 const renderMessageContent = (content) => {
   if (!content.includes('<mermaid>')) {
-      return <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>;
+      return (
+          <div className="markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          </div>
+      );
   }
   
   const parts = content.split(/(<mermaid>[\s\S]*?<\/mermaid>)/);
@@ -17,7 +21,11 @@ const renderMessageContent = (content) => {
           const chart = part.replace('<mermaid>', '').replace('</mermaid>', '').trim();
           return <Mermaid key={i} chart={chart} />;
       }
-      return <ReactMarkdown key={i} remarkPlugins={[remarkGfm]}>{part}</ReactMarkdown>;
+      return (
+          <div key={i} className="markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{part}</ReactMarkdown>
+          </div>
+      );
   });
 };
 
