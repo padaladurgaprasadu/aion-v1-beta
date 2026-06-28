@@ -469,12 +469,25 @@ If they are asking to build, develop, create, generate, OR research a topic/proj
                 links = []
                 for q in queries[:2]:
                     try:
-                        results = ddgs.text(q, max_results=3)
+                        # Render IPs are often blocked by DDG text API, try html backend
+                        results = ddgs.html(q, max_results=3)
                         if results:
                             for res in results:
                                 links.append(f"Title: {res.get('title')}\nURL: {res.get('href')}\nSnippet: {res.get('body')}")
                     except Exception as search_err:
                         print(f"[Resource Recommender] Search failed for query '{q}': {search_err}")
+                        # Fallback to Wikipedia if DDGS blocks Render IP
+                        try:
+                            import wikipedia
+                            wiki_res = wikipedia.search(q, results=2)
+                            for wq in wiki_res:
+                                try:
+                                    page = wikipedia.page(wq, auto_suggest=False)
+                                    links.append(f"Title: {page.title} (Wikipedia)\nURL: {page.url}\nSnippet: {page.summary[:200]}...")
+                                except:
+                                    pass
+                        except Exception as wiki_err:
+                            print(f"[Resource Recommender] Wiki fallback failed: {wiki_err}")
                 return links
             
             gathered_links = await asyncio.to_thread(perform_search)

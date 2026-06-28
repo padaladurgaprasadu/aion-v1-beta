@@ -13,3 +13,4 @@ slowapi
 langchain-openai
 duckduckgo-search
 tenacity
+wikipedia
