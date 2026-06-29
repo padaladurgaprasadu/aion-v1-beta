@@ -80,8 +80,8 @@ marked.use({
         : '';
         
       return `
-        <div class="code-block-wrapper" style="position: relative; margin: 1em 0; border-radius: 8px; overflow: hidden; border: 1px solid #333;">
-          <div style="background: #1e1e1e; padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; color: #888; font-size: 0.75rem; font-family: monospace;">
+        <div class="code-block-wrapper" style="position: relative; margin: 1em 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
+          <div style="background: #1e1e1e; padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); color: #888; font-size: 0.75rem; font-family: monospace;">
             <span>${language}</span>
             <div style="display: flex; gap: 16px;">
               ${runBtnHTML}
@@ -89,7 +89,7 @@ marked.use({
             </div>
           </div>
           <pre style="margin: 0; border-radius: 0; padding: 16px; background: #0d0d0d; overflow-x: auto;"><code class="language-${language}">${safeCodeForDisplay}</code></pre>
-          <div id="sandbox-${blockId}" style="display: none; border-top: 1px dashed #333; background: #050505;"></div>
+          <div id="sandbox-${blockId}" style="display: none; border-top: 1px dashed var(--border-color); background: #050505;"></div>
         </div>
       `;
     }
@@ -170,6 +170,7 @@ function App() {
   // Phase 3 additions
   const [showDevModal, setShowDevModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [theme, setTheme] = useState(() => localStorage.getItem('aion_theme') || 'Dark (Default)')
 
   // Chat state
   const [chatInput, setChatInput] = useState('')
@@ -242,6 +243,37 @@ function App() {
           return newList;
       });
   }, [chatMessages, goal, step, blueprintJson, codeFiles, executionLogs, agentRole]);
+
+  
+  const handleRenameChat = (chatId, e) => {
+    e.stopPropagation();
+    const chat = chatHistoryList.find(c => c.id === chatId);
+    if (!chat) return;
+    const newTitle = window.prompt("Enter new title for this chat:", chat.title);
+    if (newTitle && newTitle.trim() !== "") {
+        const newList = chatHistoryList.map(c => c.id === chatId ? { ...c, title: newTitle.trim() } : c);
+        setChatHistoryList(newList);
+        try {
+            localStorage.setItem('aion_chat_history', JSON.stringify(newList));
+        } catch (err) {}
+    }
+  };
+
+  const handleDeleteChat = (chatId, e) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this chat thread?")) {
+        const newList = chatHistoryList.filter(c => c.id !== chatId);
+        setChatHistoryList(newList);
+        try {
+            localStorage.setItem('aion_chat_history', JSON.stringify(newList));
+        } catch (err) {}
+        
+        // If we deleted the active chat, clear the screen
+        if (currentChatId === chatId) {
+            handleNewChat();
+        }
+    }
+  };
 
   const handleNewChat = () => {
       setCurrentChatId(Date.now().toString());
@@ -422,6 +454,17 @@ function App() {
       });
     }
   }
+
+  
+  // Apply theme class
+  useEffect(() => {
+    localStorage.setItem('aion_theme', theme);
+    if (theme === 'Light' || (theme === 'System' && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+        document.documentElement.classList.add('light-theme');
+    } else {
+        document.documentElement.classList.remove('light-theme');
+    }
+  }, [theme]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -636,12 +679,12 @@ function App() {
   }
 
   return (
-    <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100dvh', backgroundColor: '#0f0f0f', color: '#ececec', overflow: 'hidden' }}>
+    <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100dvh', backgroundColor: 'var(--app-bg)', color: 'var(--text-primary)', overflow: 'hidden' }}>
       
       {/* TOP NAV BAR */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', backgroundColor: '#1a1a1a', borderBottom: '1px solid #2a2a2a', zIndex: 10 }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', backgroundColor: 'var(--sidebar-bg)', borderBottom: '1px solid var(--border-color)', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <button onClick={() => setShowSidebar(!showSidebar)} style={{ background: 'none', border: 'none', color: '#ccc', fontSize: '1.5rem', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Toggle Sidebar">
+          <button onClick={() => setShowSidebar(!showSidebar)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '1.5rem', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Toggle Sidebar">
             ☰
           </button>
           <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--accent), #2563eb)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', fontSize: '1.2rem' }}>A</div>
@@ -670,27 +713,34 @@ function App() {
                 className={`sidebar-history-item ${currentChatId === chat.id ? 'active' : ''}`}
                 onClick={() => handleLoadChat(chat.id)}
                 title={chat.title}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px' }}
               >
-                💬 <span className="history-item-text">{chat.title}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                    💬 <span className="history-item-text" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{chat.title}</span>
+                </div>
+                <div className="history-actions" style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={(e) => handleRenameChat(chat.id, e)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.7, fontSize: '0.8rem' }} title="Rename">✏️</button>
+                    <button onClick={(e) => handleDeleteChat(chat.id, e)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.7, fontSize: '0.8rem' }} title="Delete">🗑️</button>
+                </div>
               </div>
             ))}
           </div>
           
           <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 10px', marginBottom: '10px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#333', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px', textTransform: 'uppercase' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--border-color)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px', textTransform: 'uppercase' }}>
                 {session?.user?.email?.[0] || 'U'}
               </div>
-              <div style={{ fontSize: '0.85rem', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {session?.user?.email || 'User'}
               </div>
             </div>
             
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setShowSettingsModal(true)} style={{ flex: 1, padding: '8px 0', fontSize: '0.8rem', backgroundColor: 'transparent', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#2a2a2a'} onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
+              <button onClick={() => setShowSettingsModal(true)} style={{ flex: 1, padding: '8px 0', fontSize: '0.8rem', backgroundColor: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--border-color)'} onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
                 ⚙️ Settings
               </button>
-              <button onClick={() => supabase.auth.signOut()} style={{ flex: 1, padding: '8px 0', fontSize: '0.8rem', backgroundColor: '#2a2a2a', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#3a3a3a'} onMouseLeave={(e) => e.target.style.backgroundColor = '#2a2a2a'}>
+              <button onClick={() => supabase.auth.signOut()} style={{ flex: 1, padding: '8px 0', fontSize: '0.8rem', backgroundColor: 'var(--border-color)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#3a3a3a'} onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--border-color)'}>
                 Sign Out
               </button>
             </div>
@@ -721,7 +771,7 @@ function App() {
                 <div style={{ textAlign: 'center', marginTop: '15vh' }}>
                   <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✨</div>
                   <h2 style={{ fontSize: '2rem', marginBottom: '12px', fontWeight: '500' }}>What do you want to build?</h2>
-                  <p style={{ color: '#888', fontSize: '1.1rem' }}>Ask a question or describe an app you want to generate.</p>
+                  <p style={{ color: 'var(--modal-text-color)', fontSize: '1.1rem' }}>Ask a question or describe an app you want to generate.</p>
                 </div>
               )}
 
@@ -735,14 +785,14 @@ function App() {
                 }}>
                   <div style={{ 
                     width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
-                    backgroundColor: msg.role === 'user' ? '#333' : 'var(--accent)',
+                    backgroundColor: msg.role === 'user' ? 'var(--border-color)' : 'var(--accent)',
                     display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px',
                     textTransform: 'uppercase'
                   }}>
                     {msg.role === 'user' ? (session?.user?.email?.[0] || 'U') : 'A'}
                   </div>
                   <div style={{ 
-                    backgroundColor: msg.role === 'user' ? '#2a2a2a' : 'transparent',
+                    backgroundColor: msg.role === 'user' ? 'var(--border-color)' : 'transparent',
                     padding: msg.role === 'user' ? '12px 18px' : '6px 0',
                     borderRadius: '16px',
                     borderTopRightRadius: msg.role === 'user' ? '4px' : '16px',
@@ -788,7 +838,7 @@ function App() {
                     <button 
                       onClick={() => handleEditMessage(idx)}
                       style={{
-                        background: 'none', border: 'none', color: '#888', cursor: 'pointer',
+                        background: 'none', border: 'none', color: 'var(--modal-text-color)', cursor: 'pointer',
                         fontSize: '0.9rem', padding: '0 8px', alignSelf: 'center', opacity: 0.7
                       }}
                       title="Edit this message"
@@ -849,12 +899,12 @@ function App() {
             <form onSubmit={handleChatSubmit} style={{ 
               width: '100%', 
               maxWidth: '800px', 
-              backgroundColor: '#222', 
+              backgroundColor: 'var(--btn-bg)', 
               borderRadius: '24px', 
               padding: '8px', 
               display: 'flex', 
               alignItems: 'center', 
-              border: '1px solid #333',
+              border: '1px solid var(--border-color)',
               boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
             }}>
               <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} style={{ display: 'none' }} />
@@ -864,7 +914,7 @@ function App() {
                 style={{
                   background: 'none', 
                   border: 'none', 
-                  color: '#888',
+                  color: 'var(--modal-text-color)',
                   fontSize: '1.4rem', 
                   cursor: 'pointer', 
                   padding: '0 12px', 
@@ -890,7 +940,7 @@ function App() {
                   padding: '12px 20px', 
                   backgroundColor: 'transparent', 
                   border: 'none', 
-                  color: '#fff', 
+                  color: 'var(--text-primary)', 
                   fontSize: '1rem', 
                   outline: 'none' 
                 }}
@@ -919,9 +969,9 @@ function App() {
                   width: '40px', 
                   height: '40px', 
                   borderRadius: '50%', 
-                  backgroundColor: (isChatLoading || !chatInput.trim()) ? '#333' : 'var(--accent)', 
+                  backgroundColor: (isChatLoading || !chatInput.trim()) ? 'var(--border-color)' : 'var(--accent)', 
                   border: 'none', 
-                  color: '#fff', 
+                  color: 'var(--text-primary)', 
                   display: 'flex', 
                   justifyContent: 'center', 
                   alignItems: 'center', 
@@ -947,14 +997,14 @@ function App() {
                 <div style={{ animation: 'fadeIn 0.5s ease-out' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <h2 style={{ margin: 0, fontWeight: '500' }}>Architect's Blueprint</h2>
-                    <button onClick={handleGenerate} disabled={isLoading} style={{ padding: '10px 20px', borderRadius: '8px', backgroundColor: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 'bold', cursor: isLoading ? 'not-allowed' : 'pointer' }}>
+                    <button onClick={handleGenerate} disabled={isLoading} style={{ padding: '10px 20px', borderRadius: '8px', backgroundColor: 'var(--accent)', color: 'var(--text-primary)', border: 'none', fontWeight: 'bold', cursor: isLoading ? 'not-allowed' : 'pointer' }}>
                       {isLoading ? 'Generating Code...' : 'Approve & Build'}
                     </button>
                   </div>
-                  <p style={{ color: '#888', marginBottom: '20px' }}>Review the proposed architecture below. You can edit the JSON directly before building.</p>
+                  <p style={{ color: 'var(--modal-text-color)', marginBottom: '20px' }}>Review the proposed architecture below. You can edit the JSON directly before building.</p>
                   
                   <textarea 
-                      style={{ width: '100%', height: 'calc(100dvh - 250px)', backgroundColor: '#1e1e1e', color: '#00ff00', padding: '20px', fontFamily: 'monospace', borderRadius: '12px', border: '1px solid #333', resize: 'none', outline: 'none' }}
+                      style={{ width: '100%', height: 'calc(100dvh - 250px)', backgroundColor: '#1e1e1e', color: '#00ff00', padding: '20px', fontFamily: 'monospace', borderRadius: '12px', border: '1px solid var(--border-color)', resize: 'none', outline: 'none' }}
                       value={blueprintJson}
                       onChange={(e) => setBlueprintJson(e.target.value)}
                       disabled={isLoading}
@@ -981,13 +1031,13 @@ function App() {
                 You can edit this JSON to change the Tech Stack or add custom notes before generating!
             </p>
             <textarea 
-                style={{width: '100%', minHeight: '300px', backgroundColor: '#1e1e1e', color: '#fff', padding: '15px', fontFamily: 'monospace', borderRadius: '8px', border: '1px solid #333'}}
+                style={{width: '100%', minHeight: '300px', backgroundColor: '#1e1e1e', color: 'var(--text-primary)', padding: '15px', fontFamily: 'monospace', borderRadius: '8px', border: '1px solid var(--border-color)'}}
                 value={blueprintJson}
                 onChange={(e) => setBlueprintJson(e.target.value)}
                 disabled={isLoading}
             />
             <div style={{display: 'flex', gap: '10px', marginTop: '15px'}}>
-                <button className="build-btn" style={{backgroundColor: '#333'}} onClick={() => setStep(1)} disabled={isLoading || isPlanning}>
+                <button className="build-btn" style={{backgroundColor: 'var(--border-color)'}} onClick={() => setStep(1)} disabled={isLoading || isPlanning}>
                     ⬅️ Go Back
                 </button>
                 <button className="build-btn" onClick={handleGenerate} disabled={isLoading || isPlanning}>
@@ -1003,32 +1053,32 @@ function App() {
                 <div className="preview-section" style={{ display: 'flex', flexDirection: 'column', gap: '24px', animation: 'fadeIn 0.5s ease-out' }}>
                   
                   {/* Phase 7: Live Preview */}
-                  <div style={{ backgroundColor: '#111', borderRadius: '12px', border: '1px solid #333', overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: '1px solid #333', backgroundColor: '#1a1a1a' }}>
+                  <div style={{ backgroundColor: 'var(--sidebar-bg)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--sidebar-bg)' }}>
                         <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '500' }}>Live Preview</h3>
                         <div style={{ display: 'flex', gap: '10px' }}>
                             {!isPreviewRunning ? (
-                                <button onClick={handleStartPreview} disabled={isLoading} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff' }}>
+                                <button onClick={handleStartPreview} disabled={isLoading} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'var(--text-primary)' }}>
                                     ▶ Start
                                 </button>
                             ) : (
-                                <button onClick={handleStopPreview} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: '#fff' }}>
+                                <button onClick={handleStopPreview} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'var(--text-primary)' }}>
                                     ⏹ Stop
                                 </button>
                             )}
                             {isPreviewRunning && !isLoading && (
-                                <button onClick={() => window.open(`http://localhost:${previewPort}`, '_blank')} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #a855f7, #9333ea)', color: '#fff' }}>
+                                <button onClick={() => window.open(`http://localhost:${previewPort}`, '_blank')} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #a855f7, #9333ea)', color: 'var(--text-primary)' }}>
                                     ↗ New Tab
                                 </button>
                             )}
-                            <button onClick={() => window.location.href = 'http://localhost:8000/api/download'} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: '#fff' }}>
+                            <button onClick={() => window.location.href = 'http://localhost:8000/api/download'} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'var(--text-primary)' }}>
                                 ↓ Download
                             </button>
                         </div>
                     </div>
                     
                     {isPreviewRunning && !isLoading && (
-                        <div style={{ width: '100%', height: '500px', backgroundColor: '#fff', borderRadius: '12px', overflow: 'hidden', border: '1px solid #333' }}>
+                        <div style={{ width: '100%', height: '500px', backgroundColor: '#fff', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
                             <iframe 
                                 src={`http://localhost:${previewPort}`} 
                                 width="100%" height="100%" frameBorder="0" title="Live Preview" 
@@ -1038,20 +1088,20 @@ function App() {
                     {isPreviewRunning && isLoading && (
                         <div style={{ width: '100%', height: '200px', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: '15px' }}>
                             <div className="spinner" style={{ width: '30px', height: '30px' }}></div>
-                            <p style={{ color: '#888' }}>Booting up server and opening tab...</p>
+                            <p style={{ color: 'var(--modal-text-color)' }}>Booting up server and opening tab...</p>
                         </div>
                     )}
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
                       {/* Code Files (Simplified for Workspace) */}
-                      <div style={{ backgroundColor: '#111', borderRadius: '12px', border: '1px solid #333', padding: '20px' }}>
+                      <div style={{ backgroundColor: 'var(--sidebar-bg)', borderRadius: '12px', border: '1px solid var(--border-color)', padding: '20px' }}>
                         <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', fontWeight: '500' }}>Generated Files</h3>
                         <div style={{ maxHeight: '400px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px' }}>
                           {Object.entries(codeFiles || {}).map(([path, content]) => (
-                            <div key={path} style={{ border: '1px solid #333', borderRadius: '8px', overflow: 'hidden' }}>
-                              <div style={{ backgroundColor: '#1a1a1a', padding: '8px 12px', borderBottom: '1px solid #333', fontSize: '0.85rem', color: '#aaa', fontFamily: 'monospace' }}>📄 {path}</div>
-                              <pre style={{ margin: 0, padding: '15px', backgroundColor: '#0d0d0d', color: '#a6accd', fontSize: '0.85rem', overflowX: 'auto' }}>{content}</pre>
+                            <div key={path} style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
+                              <div style={{ backgroundColor: 'var(--sidebar-bg)', padding: '8px 12px', borderBottom: '1px solid var(--border-color)', fontSize: '0.85rem', color: 'var(--modal-text-color)', fontFamily: 'monospace' }}>📄 {path}</div>
+                              <pre style={{ margin: 0, padding: '15px', backgroundColor: 'var(--input-bg)', color: '#a6accd', fontSize: '0.85rem', overflowX: 'auto' }}>{content}</pre>
                             </div>
                           ))}
                         </div>
@@ -1064,18 +1114,18 @@ function App() {
               {isLoading && step === 2 && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10,10,10,0.95)', display: 'flex', flexDirection: 'column', zIndex: 50, padding: '30px', animation: 'fadeIn 0.3s ease-out' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                     <h3 style={{ margin: 0, fontWeight: '500', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                     <h3 style={{ margin: 0, fontWeight: '500', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div className="spinner" style={{ width: '20px', height: '20px' }}></div>
                         Writing Code...
                      </h3>
-                     <span style={{ color: '#888', fontSize: '0.9rem' }}>Streaming Live from AiON Coder Agent</span>
+                     <span style={{ color: 'var(--modal-text-color)', fontSize: '0.9rem' }}>Streaming Live from AiON Coder Agent</span>
                   </div>
                   
-                  <div style={{ flex: 1, backgroundColor: '#0d0d0d', borderRadius: '12px', border: '1px solid #333', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+                  <div style={{ flex: 1, backgroundColor: 'var(--input-bg)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
                      {/* Tab Bar */}
-                     <div style={{ backgroundColor: '#1a1a1a', padding: '10px 15px', borderBottom: '1px solid #333', display: 'flex', gap: '10px', overflowX: 'auto' }}>
+                     <div style={{ backgroundColor: 'var(--sidebar-bg)', padding: '10px 15px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '10px', overflowX: 'auto' }}>
                         {Object.keys(liveCodeFiles).map(file => (
-                           <div key={file} style={{ padding: '6px 12px', backgroundColor: '#333', borderRadius: '6px', fontSize: '0.85rem', color: '#fff', whiteSpace: 'nowrap', border: '1px solid #444' }}>
+                           <div key={file} style={{ padding: '6px 12px', backgroundColor: 'var(--border-color)', borderRadius: '6px', fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', border: '1px solid #444' }}>
                               📄 {file}
                            </div>
                         ))}
@@ -1098,20 +1148,20 @@ function App() {
         
         {/* SETTINGS MODAL */}
         {showSettingsModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
-            <div style={{ backgroundColor: '#1a1a1a', padding: '30px', borderRadius: '16px', width: '90%', maxWidth: '400px', border: '1px solid #333', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'var(--modal-overlay)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999 }}>
+            <div style={{ backgroundColor: 'var(--sidebar-bg)', padding: '30px', borderRadius: '16px', width: '90%', maxWidth: '400px', border: '1px solid var(--border-color)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
               <h2 style={{ margin: '0 0 20px 0', fontSize: '1.5rem', fontWeight: '600' }}>Settings</h2>
               
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', color: '#888', marginBottom: '8px', fontSize: '0.9rem' }}>Account Email</label>
-                <div style={{ padding: '12px', backgroundColor: '#0d0d0d', border: '1px solid #333', borderRadius: '8px', color: '#ccc' }}>
+                <label style={{ display: 'block', color: 'var(--modal-text-color)', marginBottom: '8px', fontSize: '0.9rem' }}>Account Email</label>
+                <div style={{ padding: '12px', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-secondary)' }}>
                   {session?.user?.email}
                 </div>
               </div>
               
               <div style={{ marginBottom: '30px' }}>
-                <label style={{ display: 'block', color: '#888', marginBottom: '8px', fontSize: '0.9rem' }}>Theme</label>
-                <select style={{ width: '100%', padding: '12px', backgroundColor: '#0d0d0d', border: '1px solid #333', borderRadius: '8px', color: '#ccc', appearance: 'none', cursor: 'pointer' }}>
+                <label style={{ display: 'block', color: 'var(--modal-text-color)', marginBottom: '8px', fontSize: '0.9rem' }}>Theme</label>
+                <select style={{ width: '100%', padding: '12px', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-secondary)', appearance: 'none', cursor: 'pointer' }}>
                   <option>Dark (Default)</option>
                   <option>Light</option>
                   <option>System</option>
@@ -1119,7 +1169,7 @@ function App() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                <button onClick={() => setShowSettingsModal(false)} style={{ padding: '10px 20px', backgroundColor: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                <button onClick={() => setShowSettingsModal(false)} style={{ padding: '10px 20px', backgroundColor: 'var(--accent)', color: 'var(--text-primary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
                   Save & Close
                 </button>
               </div>
