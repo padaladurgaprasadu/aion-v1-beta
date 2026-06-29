@@ -1,5 +1,13 @@
 import os
 import sys
+
+# Patch sqlite3 for ChromaDB on Render (older Ubuntu bases have sqlite < 3.35)
+try:
+    __import__('pysqlite3')
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except ImportError:
+    pass
+
 import subprocess
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Header
 from fastapi.middleware.cors import CORSMiddleware
