@@ -162,6 +162,7 @@ function App() {
   const [isPreviewRunning, setIsPreviewRunning] = useState(false)
   const [awaitingApproval, setAwaitingApproval] = useState(false)
   const [previewPort, setPreviewPort] = useState(null)
+  const [showSidebar, setShowSidebar] = useState(true)
   
   // Phase 3 additions
   const [showDevModal, setShowDevModal] = useState(false)
@@ -630,17 +631,15 @@ function App() {
       
       {/* TOP NAV BAR */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', backgroundColor: '#1a1a1a', borderBottom: '1px solid #2a2a2a', zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <button onClick={() => setShowSidebar(!showSidebar)} style={{ background: 'none', border: 'none', color: '#ccc', fontSize: '1.5rem', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Toggle Sidebar">
+            ☰
+          </button>
           <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, var(--accent), #2563eb)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', fontSize: '1.2rem' }}>A</div>
           <h1 style={{ margin: 0, fontSize: '1.2rem', letterSpacing: '1px', fontWeight: '600' }}>AiON</h1>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={() => setShowSettingsModal(true)} style={{ padding: '8px 16px', fontSize: '0.85rem', backgroundColor: 'transparent', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s', display: 'flex', alignItems: 'center', gap: '6px' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#2a2a2a'} onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
-            ⚙️ Settings
-          </button>
-          <button onClick={() => supabase.auth.signOut()} style={{ padding: '8px 16px', fontSize: '0.85rem', backgroundColor: '#2a2a2a', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#3a3a3a'} onMouseLeave={(e) => e.target.style.backgroundColor = '#2a2a2a'}>
-            Sign Out
-          </button>
+          {/* Header right side is now empty, profile moved to sidebar */}
         </div>
       </header>
       
@@ -648,13 +647,14 @@ function App() {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         
         {/* LEFT NAVIGATION SIDEBAR */}
-        <aside className="sidebar">
+        {showSidebar && (
+        <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column' }}>
           <button className="sidebar-new-chat-btn" onClick={handleNewChat}>
             <span style={{ fontSize: '1.2rem' }}>➕</span> New Chat
           </button>
           
           <div className="sidebar-history-title">Recent Chats</div>
-          <div className="sidebar-history-list">
+          <div className="sidebar-history-list" style={{ flex: 1, overflowY: 'auto' }}>
             {chatHistoryList.map(chat => (
               <div 
                 key={chat.id} 
@@ -666,10 +666,32 @@ function App() {
               </div>
             ))}
           </div>
-            <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>
+          
+          <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '0 10px', marginBottom: '10px' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#333', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px', textTransform: 'uppercase' }}>
+                {session?.user?.email?.[0] || 'U'}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {session?.user?.email || 'User'}
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowSettingsModal(true)} style={{ flex: 1, padding: '8px 0', fontSize: '0.8rem', backgroundColor: 'transparent', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#2a2a2a'} onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}>
+                ⚙️ Settings
+              </button>
+              <button onClick={() => supabase.auth.signOut()} style={{ flex: 1, padding: '8px 0', fontSize: '0.8rem', backgroundColor: '#2a2a2a', color: '#ccc', border: '1px solid #333', borderRadius: '6px', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#3a3a3a'} onMouseLeave={(e) => e.target.style.backgroundColor = '#2a2a2a'}>
+                Sign Out
+              </button>
+            </div>
+            
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center', marginTop: '10px' }}>
               AiON v1.0.1
             </div>
+          </div>
         </aside>
+        )}
 
         {/* CHAT SECTION (Centers when step=1, shrinks to 30% when step>1) */}
         <div style={{ 
