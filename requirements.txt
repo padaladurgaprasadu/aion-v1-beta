@@ -14,3 +14,4 @@ langchain-openai
 duckduckgo-search
 tenacity
 wikipedia
+PyJWT
