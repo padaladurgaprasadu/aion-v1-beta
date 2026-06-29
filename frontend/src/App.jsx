@@ -355,9 +355,15 @@ function App() {
       setIsChatLoading(false) // Stop the spinner once stream starts
       
       if (!response.ok) {
+        let errorDetail = `⚠️ Error: Could not connect to AI.`;
+        try {
+            const errData = await response.json();
+            if (errData.detail) errorDetail = `⚠️ Error: ${errData.detail}`;
+        } catch(e) {}
+        
         setChatMessages(prev => {
             const newMsgs = [...prev];
-            newMsgs[newMsgs.length - 1].content = `⚠️ Error: Could not connect to AI.`;
+            newMsgs[newMsgs.length - 1].content = errorDetail;
             return newMsgs;
         });
         return;
