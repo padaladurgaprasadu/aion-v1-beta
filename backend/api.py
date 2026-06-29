@@ -24,6 +24,10 @@ load_dotenv()
 
 app = FastAPI(title="AiON API")
 
+@app.get("/")
+def health_check():
+    return {"status": "ok", "message": "AiON Backend is running"}
+
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
