@@ -170,7 +170,6 @@ function App() {
   // Phase 3 additions
   const [showDevModal, setShowDevModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
-  const [theme, setTheme] = useState(() => localStorage.getItem('aion_theme') || 'Dark (Default)')
 
   // Chat state
   const [chatInput, setChatInput] = useState('')
@@ -455,16 +454,7 @@ function App() {
     }
   }
 
-  
-  // Apply theme class
-  useEffect(() => {
-    localStorage.setItem('aion_theme', theme);
-    if (theme === 'Light' || (theme === 'System' && window.matchMedia('(prefers-color-scheme: light)').matches)) {
-        document.documentElement.classList.add('light-theme');
-    } else {
-        document.documentElement.classList.remove('light-theme');
-    }
-  }, [theme]);
+
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -1159,14 +1149,7 @@ function App() {
                 </div>
               </div>
               
-              <div style={{ marginBottom: '30px' }}>
-                <label style={{ display: 'block', color: 'var(--modal-text-color)', marginBottom: '8px', fontSize: '0.9rem' }}>Theme</label>
-                <select style={{ width: '100%', padding: '12px', backgroundColor: 'var(--input-bg)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-secondary)', appearance: 'none', cursor: 'pointer' }}>
-                  <option>Dark (Default)</option>
-                  <option>Light</option>
-                  <option>System</option>
-                </select>
-              </div>
+
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button onClick={() => setShowSettingsModal(false)} style={{ padding: '10px 20px', backgroundColor: 'var(--accent)', color: 'var(--text-primary)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
