@@ -45,6 +45,9 @@ const handleMarkdownClick = async (e) => {
         })
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || JSON.stringify(data) || "Execution API failed with status " + res.status);
+      }
       const output = data.output || data.message || "No output returned.";
       outputDiv.innerHTML = `<pre style="margin:0; padding:12px; background:#050505; color:#4ade80; font-family:monospace; font-size:0.85rem; overflow-x:auto;">${output.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`;
     } catch (err) {
