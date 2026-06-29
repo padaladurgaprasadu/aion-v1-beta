@@ -64,11 +64,18 @@ def verify_token(authorization: str = Header(None)):
         # If we have a jwt_secret, try HS256 first
         hs256_failed = False
         if jwt_secret:
+            import base64
+            # Try plain string first
             try:
                 decoded = jwt.decode(token, jwt_secret, algorithms=["HS256"], options={"verify_aud": False})
                 return decoded
-            except Exception as hs256_err:
-                hs256_failed = True
+            except Exception:
+                # If plain string fails, try base64 decoding it (Standard for Supabase legacy secrets)
+                try:
+                    decoded = jwt.decode(token, base64.b64decode(jwt_secret), algorithms=["HS256"], options={"verify_aud": False})
+                    return decoded
+                except Exception as hs256_err:
+                    hs256_failed = True
                 
         # If HS256 failed, OR if we don't have a jwt_secret but we DO have supabase_url, try JWKS
         if supabase_url and (hs256_failed or not jwt_secret):

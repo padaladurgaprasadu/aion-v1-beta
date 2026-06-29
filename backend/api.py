@@ -44,6 +44,13 @@ except Exception as e:
     @app.get("/debug")
     def debug_info():
         return PlainTextResponse(startup_error)
+        
+    @app.get("/debug/env")
+    def debug_env():
+        s_url = os.getenv("SUPABASE_URL", "NOT_SET")
+        s_secret = os.getenv("SUPABASE_JWT_SECRET", "NOT_SET")
+        if s_secret != "NOT_SET": s_secret = s_secret[:5] + "..." + s_secret[-5:]
+        return {"SUPABASE_URL": s_url, "SUPABASE_JWT_SECRET": s_secret}
     
     # Catch-all for API routes to explain why it's down
     @app.api_route("/{path_name:path}", methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"])
