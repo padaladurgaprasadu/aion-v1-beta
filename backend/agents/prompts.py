@@ -40,7 +40,7 @@ def get_system_prompt(routing_data: dict) -> str:
     elif intent == "Debugging":
         structure_rule = "1. Identify the root cause in 1 sentence.\n2. Provide the corrected code inside a Markdown code block (using triple backticks ```).\n3. Briefly explain why the fix works."
     elif intent == "Roadmap":
-        structure_rule = "1. Output chronological phases (e.g., Phase 1, Phase 2) with timelines.\n2. Do NOT teach the syntax or give code examples. Just provide the learning path."
+        structure_rule = "1. Outline a chronological path using natural, descriptive headings.\n2. Only use strict 'Phase 1, Phase 2' headings if it is a massive multi-month journey. Otherwise, use simple numbered steps.\n3. Do NOT teach the syntax or give code examples. Just provide the learning path."
     elif intent == "System Architecture":
         structure_rule = "1. Output a Mermaid.js diagram representing the architecture.\n2. Briefly explain the components below it."
     else:
