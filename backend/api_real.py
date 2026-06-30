@@ -604,10 +604,10 @@ async def ai_chat(request_data: ChatRequest, request: Request):
     from backend.agents.router import IntentRouter
     from backend.agents.prompts import get_system_prompt
 
-    # Phase 2: Dynamic Intent Routing
+    # Phase 2.5: Dynamic Prompt Composer (Multi-Dimensional Intent Routing)
     router = IntentRouter(llm=agent.llm)
-    intent = router.detect_intent(sanitized_message, request_data.history)
-    base_prompt = get_system_prompt(intent)
+    intent_data = router.detect_intent(sanitized_message, request_data.history)
+    base_prompt = get_system_prompt(intent_data)
 
     USER_MEMORY = request_data.memory if request_data.memory else "None"
 

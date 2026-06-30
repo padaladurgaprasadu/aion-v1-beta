@@ -1,7 +1,6 @@
 from pydantic import BaseModel, Field
 import json
 from langchain_core.messages import HumanMessage, SystemMessage
-from backend.agents.prompts import IntentCategory
 from backend.utils.logger import get_logger
 
 logger = get_logger("AiON_Router")
@@ -16,22 +15,24 @@ class IntentRouter:
         
         self.system_prompt = """
 You are an ultra-fast Intent Detection Engine.
-Analyze the user's message and categorize it into EXACTLY ONE of the following categories:
-LEARNING, CODING, DEBUGGING, RESEARCH, TRAVEL, SHOPPING, MEDICAL, FINANCE, LEGAL, WRITING, TRANSLATION, BRAINSTORMING, PROJECT_PLANNING, CAREER, GENERAL.
+Analyze the user's message and extract exactly four dimensions.
 
 RULES:
-1. Output ONLY a valid JSON object in this format: {"intent": "CATEGORY"}
+1. Output ONLY a valid JSON object in this format:
+{
+  "domain": "e.g., Education, Software Engineering, Travel, Medicine, Finance",
+  "specific_intent": "e.g., Explain Concept, Learning Roadmap, Interview Prep, Debugging, Project Planning",
+  "complexity": "Beginner, Intermediate, or Advanced",
+  "style": "e.g., Step-by-step phases, Clear and concise, Q&A format, Table comparison"
+}
 2. Do NOT output any other text, markdown, or explanation.
-3. If unsure, fallback to "GENERAL".
 """
 
-    def detect_intent(self, message: str, history: list = None) -> IntentCategory:
+    def detect_intent(self, message: str, history: list = None) -> dict:
         """
-        Runs a fast LLM inference to determine the user's intent.
+        Runs a fast LLM inference to determine the user's multi-dimensional intent.
         """
         try:
-            # Prepare context. If it's a follow-up, the history helps contextualize.
-            # But we keep it short to save TTFT.
             context = f"User Message: {message}"
             if history and len(history) > 0:
                 context = f"Previous context: {history[-1].get('content', '')[:100]}\n{context}"
@@ -41,30 +42,23 @@ RULES:
                 HumanMessage(content=context)
             ]
             
-            # We don't stream this, we just invoke it.
-            # Some Langchain models support structured output, but for maximum compatibility across OpenAI, Groq, NVIDIA, Ollama:
-            # We just parse the raw string.
             response = self.llm.invoke(messages)
             content = response.content.strip()
             
-            # Strip markdown if the LLM ignored Rule 2
             if content.startswith("```json"):
                 content = content[7:-3].strip()
             elif content.startswith("```"):
                 content = content[3:-3].strip()
                 
             data = json.loads(content)
-            intent_str = data.get("intent", "GENERAL").upper()
-            
-            # Safely cast to Enum
-            try:
-                intent = IntentCategory(intent_str)
-            except ValueError:
-                intent = IntentCategory.GENERAL
-                
-            logger.info(f"[ROUTER] Detected Intent: {intent.value}")
-            return intent
+            logger.info(f"[ROUTER] Detected Intent: {data}")
+            return data
             
         except Exception as e:
             logger.warning(f"[ROUTER] Intent detection failed, falling back to GENERAL. Error: {e}")
-            return IntentCategory.GENERAL
+            return {
+                "domain": "General",
+                "specific_intent": "General Chat",
+                "complexity": "Intermediate",
+                "style": "Clear and concise"
+            }
