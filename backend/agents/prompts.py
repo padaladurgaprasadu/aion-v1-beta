@@ -62,7 +62,7 @@ Since the user's intent is '{intent}', you MUST strictly follow this exact struc
 **Visual Diagrams:** If a visual aid is requested or required, you MUST generate a Mermaid.js diagram wrapped in XML tags. Do NOT use ASCII art.
 
 [FINAL FORMATTING REMINDER]:
-- ALWAYS wrap code in triple backticks (```) so it renders correctly. Do NOT output raw inline code blocks for large snippets.
+- ALWAYS wrap code in triple backticks (```) so it renders correctly. You MUST place the triple backticks on their own blank lines (with a double newline before and after them). Do NOT put backticks inline with text.
 - NEVER output a giant monolithic paragraph. Use markdown bullet points, bold text, and double newlines to separate concepts.
 """
     return prompt
