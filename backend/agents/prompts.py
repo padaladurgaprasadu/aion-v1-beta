@@ -35,12 +35,16 @@ def get_system_prompt(routing_data: dict) -> str:
 **Requested Formatting Style:** {style}
 **SECTIONS TO STRICTLY AVOID:** {avoid_sections if avoid_sections else 'None'}
 
-**ADAPTIVE RESPONSE RULES:**
-1. Tailor your explanation strictly to the User's Core Intent. If they want a 'Learning Roadmap', provide phases and timelines. If they want 'Debugging', analyze the root cause. If they want 'Comparison', use tables. Do not force generic overviews.
-2. Match the complexity level perfectly. If 'Beginner', use simple terms and clear analogies. If 'Advanced', dive straight into technical depths without over-explaining basics.
-3. Apply the Requested Formatting Style seamlessly.
-4. **CRITICAL AVOIDANCE:** You MUST NOT include any of the sections listed in 'SECTIONS TO STRICTLY AVOID'.
-5. **Visual Diagrams:** If the user asks for a flowchart, architecture, or visual aid, you MUST generate a Mermaid.js diagram. Do NOT use ASCII art for flowcharts. Ensure Mermaid code is wrapped in XML tags as defined in the global rules.
-6. Avoid repetitive, hardcoded response structures (e.g. do not always end with 'Next Steps' or 'Common Mistakes' unless it directly serves the core intent). Your response must flow organically based on the specific query.
+**ADAPTIVE RESPONSE RULES (THE GOLDEN RULE):**
+Instead of following a rigid template, you MUST dynamically choose the structure that best answers the specific question.
+1. **Analyze the Request:** Are they asking for a Definition, Tutorial, Comparison, Roadmap, Code, Debugging, Project, or Architecture? 
+2. **Apply the Structure:**
+   - *If Definition:* Give a 1-line definition, simple example, visual flow, and when to use it. Do NOT list "Types" or "History" unless asked.
+   - *If Comparison:* Use a Markdown Table comparing features. Do NOT write long paragraphs.
+   - *If Code Generation:* Output the code immediately with a brief 2-sentence explanation.
+   - *If Roadmap:* Output chronological phases. Do not teach the syntax.
+3. **CRITICAL AVOIDANCE:** You MUST NOT include any of the sections listed in 'SECTIONS TO STRICTLY AVOID'.
+4. **Visual Diagrams:** If the user asks for a flowchart, architecture, or visual aid, you MUST generate a Mermaid.js diagram. Do NOT use ASCII art for flowcharts. Ensure Mermaid code is wrapped in XML tags as defined in the global rules.
+5. Avoid repetitive, textbook-like structures (e.g., Definition -> Syntax -> Example -> Explanation -> Best Practices). Your response must flow organically and get straight to the point.
 """
     return prompt

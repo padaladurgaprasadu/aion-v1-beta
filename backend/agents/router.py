@@ -21,7 +21,7 @@ RULES:
 1. Output ONLY a valid JSON object in this format:
 {
   "domain": "e.g., Education, Software Engineering, Travel, Medicine, Finance",
-  "specific_intent": "e.g., Explain Concept, Learning Roadmap, System Architecture, Diagram Generation, Debugging",
+  "specific_intent": "MUST BE EXACTLY ONE OF: Definition, Tutorial, Comparison, Roadmap, Code Generation, Debugging, Project, System Architecture",
   "complexity": "Beginner, Intermediate, or Advanced",
   "style": "e.g., Step-by-step phases, Clear and concise, Q&A format, Table comparison",
   "avoid_sections": ["list", "of", "sections", "or", "elements", "to", "strictly", "avoid"]
