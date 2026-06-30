@@ -31,7 +31,12 @@ from backend.memory.chroma_client import ChromaClient
 
 load_dotenv()
 
-app = FastAPI(title="AiON API")
+app = FastAPI(
+    title="AiON API",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None
+)
 
 @app.get("/")
 def health_check():
