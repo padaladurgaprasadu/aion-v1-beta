@@ -38,6 +38,25 @@ app = FastAPI(
     openapi_url=None
 )
 
+from backend.utils.logger import get_logger
+import time
+api_logger = get_logger("AiON_API")
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = None
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        process_time = (time.time() - start_time) * 1000
+        api_logger.error(f"[ERROR] {request.method} {request.url.path} failed in {process_time:.2f}ms. Exception: {e}")
+        raise e
+        
+    process_time = (time.time() - start_time) * 1000
+    api_logger.info(f"[API] {request.method} {request.url.path} - Status: {response.status_code} - Latency: {process_time:.2f}ms")
+    return response
+
 @app.get("/")
 def health_check():
     return {"status": "ok", "message": "AiON Backend is running"}
@@ -687,27 +706,38 @@ Example: `[MEMORY_ADD] User is a physics student.`
         messages.append(HumanMessage(content=sanitized_message))
     async def event_generator():
         import json
+        import time
         try:
+            start_time = time.time()
             is_build = False
             buffer = ""
             flushed_initial = False
+            ttft_logged = False
             
             # === SEMANTIC CACHE HIT CHECK ===
             if len(request_data.history) == 0 and not request_data.image:
                 try:
                     from backend.memory.chroma_client import ChromaClient
                     cache_client = ChromaClient()
-                    cached_response = cache_client.get_cache(sanitized_message)
+                    cached_response, distance = cache_client.get_cache(sanitized_message)
                     if cached_response:
+                        ttft = (time.time() - start_time) * 1000
+                        api_logger.info(f"[CACHE HIT] Distance: {distance:.4f} | TTFT: {ttft:.2f}ms | Query: '{sanitized_message[:30]}...'")
                         escaped_chunk = json.dumps({"type": "chat", "token": cached_response})
                         yield f"data: {escaped_chunk}\n\n"
                         return
+                    else:
+                        api_logger.info(f"[CACHE MISS] Query: '{sanitized_message[:30]}...'")
                 except Exception as e:
-                    print(f"[Semantic Cache] Error checking cache: {e}")
-            # ================================
+                    pass
 
             # Stream the response
             for chunk in agent.llm.stream(messages):
+                if not ttft_logged:
+                    ttft = (time.time() - start_time) * 1000
+                    api_logger.info(f"[LLM TTFT] First token generated in {ttft:.2f}ms")
+                    ttft_logged = True
+                    
                 text_chunk = chunk.content
                 if isinstance(text_chunk, list):
                     text_chunk = "".join(c.get("text", "") if isinstance(c, dict) else str(c) for c in text_chunk)

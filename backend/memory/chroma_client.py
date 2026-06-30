@@ -65,7 +65,7 @@ class ChromaClient:
         """Searches for a semantically similar query in the cache."""
         try:
             if self.cache_collection.count() == 0:
-                return None
+                return None, 0
             
             results = self.cache_collection.query(
                 query_texts=[query],
@@ -73,17 +73,12 @@ class ChromaClient:
             )
             
             if results and results["documents"] and len(results["documents"][0]) > 0:
-                # results["distances"] contains the L2 distance. Smaller is closer.
                 distance = results["distances"][0][0] if "distances" in results and results["distances"] else 0
                 if distance < threshold:
-                    print(f"[Semantic Cache Hit] Distance: {distance:.4f} for query: {query}")
-                    return results["documents"][0][0]
-                else:
-                    print(f"[Semantic Cache Miss] Closest distance: {distance:.4f}")
-            return None
+                    return results["documents"][0][0], distance
+            return None, 0
         except Exception as e:
-            print(f"   -> [WARNING] Semantic Cache search failed: {e}")
-            return None
+            return None, 0
 
     def set_cache(self, query: str, response: str):
         """Saves a query-response pair to the semantic cache."""
