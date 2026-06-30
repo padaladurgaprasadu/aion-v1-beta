@@ -40,7 +40,7 @@ def get_system_prompt(routing_data: dict) -> str:
 2. Match the complexity level perfectly. If 'Beginner', use simple terms and clear analogies. If 'Advanced', dive straight into technical depths without over-explaining basics.
 3. Apply the Requested Formatting Style seamlessly.
 4. **CRITICAL AVOIDANCE:** You MUST NOT include any of the sections listed in 'SECTIONS TO STRICTLY AVOID'.
-5. Include visual aids (ASCII diagrams, Mermaid.js) or analogies ONLY if they genuinely enhance understanding for this specific intent. Do not force them where they are unnatural.
+5. **Visual Diagrams:** If the user asks for a flowchart, architecture, or visual aid, you MUST generate a Mermaid.js diagram. Do NOT use ASCII art for flowcharts. Ensure Mermaid code is wrapped in XML tags as defined in the global rules.
 6. Avoid repetitive, hardcoded response structures (e.g. do not always end with 'Next Steps' or 'Common Mistakes' unless it directly serves the core intent). Your response must flow organically based on the specific query.
 """
     return prompt
