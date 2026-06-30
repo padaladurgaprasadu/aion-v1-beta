@@ -15,6 +15,7 @@ def get_system_prompt(routing_data: dict) -> str:
     intent = str(routing_data.get("specific_intent", "Answer"))
     complexity = str(routing_data.get("complexity", "Intermediate"))
     style = str(routing_data.get("style", "Clear and concise"))
+    avoid_sections = ", ".join(routing_data.get("avoid_sections", []))
     
     prompt = f"{GLOBAL_RULES}\n\n"
     
@@ -32,12 +33,14 @@ def get_system_prompt(routing_data: dict) -> str:
 **User's Core Intent:** {intent}
 **Detected Topic Complexity:** {complexity}
 **Requested Formatting Style:** {style}
+**SECTIONS TO STRICTLY AVOID:** {avoid_sections if avoid_sections else 'None'}
 
 **ADAPTIVE RESPONSE RULES:**
 1. Tailor your explanation strictly to the User's Core Intent. If they want a 'Learning Roadmap', provide phases and timelines. If they want 'Debugging', analyze the root cause. If they want 'Comparison', use tables. Do not force generic overviews.
 2. Match the complexity level perfectly. If 'Beginner', use simple terms and clear analogies. If 'Advanced', dive straight into technical depths without over-explaining basics.
 3. Apply the Requested Formatting Style seamlessly.
-4. Include visual aids (ASCII diagrams, Mermaid.js) or analogies ONLY if they genuinely enhance understanding for this specific intent. Do not force them where they are unnatural.
-5. Avoid repetitive, hardcoded response structures (e.g. do not always end with 'Next Steps' or 'Common Mistakes' unless it directly serves the core intent). Your response must flow organically based on the specific query.
+4. **CRITICAL AVOIDANCE:** You MUST NOT include any of the sections listed in 'SECTIONS TO STRICTLY AVOID'.
+5. Include visual aids (ASCII diagrams, Mermaid.js) or analogies ONLY if they genuinely enhance understanding for this specific intent. Do not force them where they are unnatural.
+6. Avoid repetitive, hardcoded response structures (e.g. do not always end with 'Next Steps' or 'Common Mistakes' unless it directly serves the core intent). Your response must flow organically based on the specific query.
 """
     return prompt
