@@ -609,7 +609,16 @@ async def ai_chat(request_data: ChatRequest, request: Request):
     intent_data = router.detect_intent(sanitized_message, request_data.history)
     base_prompt = get_system_prompt(intent_data)
 
-    USER_MEMORY = request_data.memory if request_data.memory else "None"
+    # 🟢 PHASE 3: Persistent Vector Memory (ChromaDB) Retrieval
+    from backend.memory.chroma_client import ChromaClient
+    try:
+        memory_client = ChromaClient()
+        USER_MEMORY = memory_client.retrieve_memory("default_user", sanitized_message)
+        if not USER_MEMORY:
+            USER_MEMORY = "No past memory recorded yet."
+    except Exception as e:
+        api_logger.warning(f"Failed to retrieve vector memory: {e}")
+        USER_MEMORY = "No past memory recorded yet."
 
     system_prompt = f"""{base_prompt}
 
@@ -622,11 +631,6 @@ async def ai_chat(request_data: ChatRequest, request: Request):
 [USER'S PAST MEMORY]:
 {USER_MEMORY}
 """
-
-
-# Inject memory if available
-    user_mem = request_data.memory if request_data.memory else "No past memory recorded yet."
-    system_prompt = system_prompt.replace("{USER_MEMORY}", user_mem)
 
     messages = [SystemMessage(content=system_prompt)]
     for msg in request_data.history:
@@ -721,6 +725,22 @@ async def ai_chat(request_data: ChatRequest, request: Request):
                 except Exception as e:
                     escaped_chunk = json.dumps({"type": "chat", "token": "\n\n(Error parsing build parameters. Please try again.)"})
                     yield f"data: {escaped_chunk}\n\n"
+            
+            # 🟢 PHASE 3: Autonomous Memory Storage
+            if not is_build and "[MEMORY_ADD]" in buffer:
+                try:
+                    import re
+                    memory_match = re.search(r'\[MEMORY_ADD\](.*)', buffer)
+                    if memory_match:
+                        new_fact = memory_match.group(1).strip()
+                        from backend.memory.chroma_client import ChromaClient
+                        import asyncio
+                        def save_mem():
+                            ChromaClient().store_memory("default_user", new_fact)
+                        asyncio.create_task(asyncio.to_thread(save_mem))
+                        api_logger.info(f"[MEMORY] Saved new fact: {new_fact}")
+                except Exception as e:
+                    api_logger.warning(f"Failed to save autonomous memory: {e}")
             
             # === SEMANTIC CACHE SET ===
             if len(request_data.history) == 0 and not request_data.image and not is_build:

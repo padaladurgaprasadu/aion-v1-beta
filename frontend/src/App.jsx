@@ -172,7 +172,6 @@ function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   // Chat state
-  const [userMemory, setUserMemory] = useState(() => localStorage.getItem('aion_memory') || '')
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState([])
   const [isChatLoading, setIsChatLoading] = useState(false)
@@ -381,7 +380,7 @@ function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token || 'mock-token-for-local-dev'}`
         },
-        body: JSON.stringify({ message: userMessage, history: chatMessages, image: imagePayload, memory: userMemory })
+        body: JSON.stringify({ message: userMessage, history: chatMessages, image: imagePayload })
       })
       
       setIsChatLoading(false) // Stop the spinner once stream starts
@@ -451,12 +450,6 @@ function App() {
           let finalMsg = newMsgs[newMsgs.length - 1].content;
           const memoryMatch = finalMsg.match(/\[MEMORY_ADD\](.*)/);
           if (memoryMatch) {
-              const newFact = memoryMatch[1].trim();
-              setUserMemory(prevMem => {
-                  const updatedMem = prevMem + (prevMem ? '\n' : '') + "- " + newFact;
-                  localStorage.setItem('aion_memory', updatedMem);
-                  return updatedMem;
-              });
               finalMsg = finalMsg.replace(/\[MEMORY_ADD\].*/, '').trim();
               newMsgs[newMsgs.length - 1].content = finalMsg;
           }
@@ -547,12 +540,6 @@ function App() {
           let finalMsg = newMsgs[newMsgs.length - 1].content;
           const memoryMatch = finalMsg.match(/\[MEMORY_ADD\](.*)/);
           if (memoryMatch) {
-              const newFact = memoryMatch[1].trim();
-              setUserMemory(prevMem => {
-                  const updatedMem = prevMem + (prevMem ? '\n' : '') + "- " + newFact;
-                  localStorage.setItem('aion_memory', updatedMem);
-                  return updatedMem;
-              });
               finalMsg = finalMsg.replace(/\[MEMORY_ADD\].*/, '').trim();
               newMsgs[newMsgs.length - 1].content = finalMsg;
           }
@@ -645,12 +632,6 @@ function App() {
           let finalMsg = newMsgs[newMsgs.length - 1].content;
           const memoryMatch = finalMsg.match(/\[MEMORY_ADD\](.*)/);
           if (memoryMatch) {
-              const newFact = memoryMatch[1].trim();
-              setUserMemory(prevMem => {
-                  const updatedMem = prevMem + (prevMem ? '\n' : '') + "- " + newFact;
-                  localStorage.setItem('aion_memory', updatedMem);
-                  return updatedMem;
-              });
               finalMsg = finalMsg.replace(/\[MEMORY_ADD\].*/, '').trim();
               newMsgs[newMsgs.length - 1].content = finalMsg;
           }

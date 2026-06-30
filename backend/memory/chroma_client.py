@@ -25,6 +25,12 @@ class ChromaClient:
             name="semantic_cache",
             embedding_function=self.embedding_fn
         )
+        
+        # Get or create user memory collection
+        self.memory_collection = self.client.get_or_create_collection(
+            name="user_memory",
+            embedding_function=self.embedding_fn
+        )
 
     def store_blueprint(self, project_id, goal, blueprint):
         """Stores the project's goal and resulting blueprint into the vector database."""
@@ -92,3 +98,40 @@ class ChromaClient:
             )
         except Exception as e:
             print(f"   -> [WARNING] Failed to set Semantic Cache: {e}")
+
+    def store_memory(self, user_id: str, fact: str):
+        """Saves a personal fact about the user into their memory collection."""
+        import uuid
+        try:
+            mem_id = f"mem-{str(uuid.uuid4())[:8]}"
+            self.memory_collection.add(
+                documents=[fact],
+                metadatas=[{"user_id": user_id}],
+                ids=[mem_id]
+            )
+            print(f"[MEMORY DB] Stored new fact for {user_id}: {fact}")
+        except Exception as e:
+            print(f"   -> [WARNING] Failed to store Memory: {e}")
+
+    def retrieve_memory(self, user_id: str, query: str, n_results: int = 3) -> str:
+        """Retrieves top semantically relevant facts about the user based on their query."""
+        try:
+            # We filter by user_id to ensure strict data separation!
+            count = self.memory_collection.count()
+            if count == 0:
+                return ""
+            
+            n = min(n_results, count)
+            results = self.memory_collection.query(
+                query_texts=[query],
+                n_results=n,
+                where={"user_id": user_id}
+            )
+            
+            if results and results["documents"] and len(results["documents"][0]) > 0:
+                facts = results["documents"][0]
+                return "\n".join([f"- {fact}" for fact in facts])
+            return ""
+        except Exception as e:
+            print(f"   -> [WARNING] Failed to retrieve Memory: {e}")
+            return ""
