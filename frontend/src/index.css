@@ -88,3 +88,50 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2); 
 }
+
+/* Markdown Rendering Styles (Restoring margins stripped by CSS reset) */
+.markdown-body {
+  word-wrap: break-word;
+}
+.markdown-body p, .markdown-body blockquote, .markdown-body ul, .markdown-body ol, .markdown-body dl, .markdown-body table, .markdown-body pre {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.markdown-body ul, .markdown-body ol {
+  padding-left: 2em;
+}
+.markdown-body li + li {
+  margin-top: 0.25em;
+}
+.markdown-body hr {
+  height: 1px;
+  background-color: var(--border-color);
+  border: none;
+  margin: 24px 0;
+}
+.markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+}
+.markdown-body code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-family: monospace;
+}
+.markdown-body pre code {
+  padding: 0;
+  background-color: transparent;
+}
