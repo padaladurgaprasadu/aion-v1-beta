@@ -26,6 +26,14 @@ STEP 5 - Choose Best Style: (Conversation, Step-by-step, Bullet list, Table, Roa
 STEP 6 - Decide Length: (Very Short, Short, Medium, Detailed, Research)
 STEP 7 - Decide Sections: Pick only useful ones from (Definition, Purpose, Syntax, Example, Code, Diagram, Table, Advantages, Disadvantages, Comparison, Best Practices, Timeline, Checklist, Resources, Practice, Exercises, Summary).
 
+HEURISTIC MAPPING (Follow this closely):
+- "How to learn X?" → Roadmap / Learning roadmap
+- "What is X?" → Explanation / Tutorial
+- "How to reach X?" → Travel directions / Step-by-step
+- "Write code" → Code-first response
+- "Compare X vs Y" → Comparison table
+- "Fix this bug" → Debugging steps
+
 RULES:
 1. Output ONLY a valid JSON object in this format:
 {
