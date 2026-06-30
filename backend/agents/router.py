@@ -37,7 +37,8 @@ RULES:
   "answer_length": "Selected from Step 6",
   "sections_to_include": ["Selected from Step 7"]
 }
-2. Do NOT output any other text, markdown, or explanation.
+2. CRITICAL RULE: Never ask for information that already exists in the conversation history. Review the full history before deciding if information is missing.
+3. Do NOT output any other text, markdown, or explanation.
 """
 
     def detect_intent(self, message: str, history: list = None) -> dict:
@@ -45,9 +46,20 @@ RULES:
         Runs a fast LLM inference to determine the user's multi-dimensional intent.
         """
         try:
-            context = f"User Message: {message}"
+            context = ""
             if history and len(history) > 0:
-                context = f"Previous context: {history[-1].get('content', '')[:100]}\n{context}"
+                context += "Conversation History:\n"
+                # Keep up to the last 5 messages for context
+                for msg in history[-5:]:
+                    role = msg.get("role", "user")
+                    content = msg.get("content", "")
+                    # Strip massive code blocks or huge texts to save tokens, but keep semantic meaning
+                    if len(content) > 300:
+                        content = content[:300] + "..."
+                    context += f"{role.capitalize()}: {content}\n"
+                context += "\n"
+                
+            context += f"Latest User Message: {message}"
 
             messages = [
                 SystemMessage(content=self.system_prompt),
