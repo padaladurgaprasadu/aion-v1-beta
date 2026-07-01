@@ -47,6 +47,10 @@ RULES:
   "needs_images": true/false (True ONLY for Places, Monuments, Animals, famous People, or physical Products. False for Code, Math, Abstract Concepts),
   "needs_map": true/false (True ONLY for geographical locations or directions),
   "needs_video": true/false (True ONLY if the user explicitly asks for a video/tutorial),
+  "needs_charts": true/false (True ONLY for statistical data, comparisons, or financial trends),
+  "needs_code": true/false (True ONLY for programming/debugging),
+  "needs_tables": true/false (True ONLY for comparisons, specs, or structured data),
+  "needs_diagrams": true/false (True ONLY for architecture, algorithms, or workflows),
   "visual_query": "The exact name of the entity to search for images (e.g. 'Adiyogi Statue', 'Albert Einstein'). Null if needs_images is false."
 }
 
