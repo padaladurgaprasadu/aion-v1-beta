@@ -605,36 +605,52 @@ async def ai_chat(request_data: ChatRequest, request: Request):
     agent = BaseAgent()
     sanitized_message = re.sub(r'<[^>]*>', '', request_data.message)
 
-    from backend.agents.router import IntentRouter
-    from backend.agents.prompts import get_system_prompt
+    # 🟢 PHASE 1: Immediate Connection & Heartbeat Logging
+    async def event_generator():
+        import json
+        import time
+        from backend.agents.router import IntentRouter
+        from backend.agents.prompts import get_system_prompt
+        
+        try:
+            start_time = time.time()
+            
+            # Immediately yield heartbeat to prevent frontend timeout
+            yield f"data: {json.dumps({'type': 'status', 'message': '✨ Analyzing Intent...'})}\n\n"
+            api_logger.info(f"TTFT_heartbeat: {(time.time() - start_time) * 1000:.2f}ms")
 
-    # Phase 2.5: Dynamic Prompt Composer (Multi-Dimensional Intent Routing)
-    router = IntentRouter(llm=agent.llm)
-    intent_data = router.detect_intent(sanitized_message, request_data.history)
-    
-    # 🟢 PHASE 4: Early Exit for Missing Information (Response Planner v1.0)
-    missing_info = intent_data.get("missing_info_question")
-    if missing_info and isinstance(missing_info, str) and missing_info.lower() not in ["none", "null", "", "n/a"]:
-        async def early_exit_generator():
-            import json
-            yield f"data: {json.dumps({'type': 'chat', 'token': missing_info})}\n\n"
-        from fastapi.responses import StreamingResponse
-        return StreamingResponse(early_exit_generator(), media_type="text/event-stream")
+            # 🟢 PHASE 2: Fast Intent Routing (Using fast_llm)
+            router = IntentRouter(llm=agent.fast_llm)
+            intent_data = router.detect_intent(sanitized_message, request_data.history)
+            
+            missing_info = intent_data.get("missing_info_question")
+            if missing_info and isinstance(missing_info, str) and missing_info.lower() not in ["none", "null", "", "n/a"]:
+                yield f"data: {json.dumps({'type': 'status', 'message': ''})}\n\n"
+                yield f"data: {json.dumps({'type': 'chat', 'token': missing_info})}\n\n"
+                return
 
-    base_prompt = get_system_prompt(intent_data)
+            base_prompt = get_system_prompt(intent_data)
 
-    # 🟢 PHASE 3: Persistent Vector Memory (ChromaDB) Retrieval
-    from backend.memory.chroma_client import ChromaClient
-    try:
-        memory_client = ChromaClient()
-        USER_MEMORY = memory_client.retrieve_memory("default_user", sanitized_message)
-        if not USER_MEMORY:
+            # 🟢 PHASE 3: Conditional Memory Retrieval
             USER_MEMORY = "No past memory recorded yet."
-    except Exception as e:
-        api_logger.warning(f"Failed to retrieve vector memory: {e}")
-        USER_MEMORY = "No past memory recorded yet."
+            complexity = str(intent_data.get("complexity", "")).lower()
+            goal = str(intent_data.get("user_goal", "")).lower()
+            
+            # Skip ChromaDB entirely for simple factual questions to maximize TTFT
+            if complexity not in ["simple"] and "concept" not in goal:
+                yield f"data: {json.dumps({'type': 'status', 'message': '✨ Searching Memory...'})}\n\n"
+                try:
+                    if global_chroma_client:
+                        USER_MEMORY = global_chroma_client.retrieve_memory("default_user", sanitized_message)
+                    else:
+                        from backend.memory.chroma_client import ChromaClient
+                        USER_MEMORY = ChromaClient().retrieve_memory("default_user", sanitized_message)
+                    if not USER_MEMORY:
+                        USER_MEMORY = "No past memory recorded yet."
+                except Exception as e:
+                    api_logger.warning(f"Failed to retrieve vector memory: {e}")
 
-    system_prompt = f"""{base_prompt}
+            system_prompt = f"""{base_prompt}
 
 [SYSTEM DIRECTIVES]:
 - **Mermaid Diagrams:** If the user explicitly asks for a Mermaid diagram, workflow, flowchart, or system design, you MUST output Mermaid.js syntax wrapped EXACTLY inside `<mermaid>` and `</mermaid>` XML tags. Do NOT use markdown backticks for the mermaid code.
@@ -645,39 +661,39 @@ async def ai_chat(request_data: ChatRequest, request: Request):
 [USER'S PAST MEMORY]:
 {USER_MEMORY}
 """
-
-    messages = [SystemMessage(content=system_prompt)]
-    for msg in request_data.history:
-        role = msg.get("role")
-        content = msg.get("content", "")
-        if role == "user":
-            messages.append(HumanMessage(content=content))
-        elif role == "ai" and not content.startswith("[BUILD]"):
-            messages.append(AIMessage(content=content))
+            messages = [SystemMessage(content=system_prompt)]
+            for msg in request_data.history:
+                role = msg.get("role")
+                content = msg.get("content", "")
+                if role == "user":
+                    messages.append(HumanMessage(content=content))
+                elif role == "ai" and not content.startswith("[BUILD]"):
+                    messages.append(AIMessage(content=content))
+                    
+            if request_data.image:
+                messages.append(HumanMessage(content=[
+                    {"type": "text", "text": sanitized_message},
+                    {"type": "image_url", "image_url": {"url": request_data.image}}
+                ]))
+            else:
+                messages.append(HumanMessage(content=sanitized_message))
             
-    if request_data.image:
-        messages.append(HumanMessage(content=[
-            {"type": "text", "text": sanitized_message},
-            {"type": "image_url", "image_url": {"url": request_data.image}}
-        ]))
-    else:
-        messages.append(HumanMessage(content=sanitized_message))
-    async def event_generator():
-        import json
-        import time
-        from backend.agents.validator import ResponseValidatorAgent
-        from backend.agents.formatter import FormatterAgent
-        
-        try:
-            start_time = time.time()
+            # Clear status indicator
+            yield f"data: {json.dumps({'type': 'status', 'message': ''})}\n\n"
+            
+            first_token_yielded = False
+            draft_text = ""
             is_build = False
+            buffer = ""
             
             # === SEMANTIC CACHE HIT CHECK ===
             if len(request_data.history) == 0 and not request_data.image:
                 try:
-                    from backend.memory.chroma_client import ChromaClient
-                    cache_client = ChromaClient()
-                    cached_response, distance = cache_client.get_cache(sanitized_message)
+                    if global_chroma_client:
+                        cached_response, distance = global_chroma_client.get_cache(sanitized_message)
+                    else:
+                        from backend.memory.chroma_client import ChromaClient
+                        cached_response, distance = ChromaClient().get_cache(sanitized_message)
                     if cached_response:
                         ttft = (time.time() - start_time) * 1000
                         api_logger.info(f"[CACHE HIT] Distance: {distance:.4f} | TTFT: {ttft:.2f}ms")
@@ -686,64 +702,50 @@ async def ai_chat(request_data: ChatRequest, request: Request):
                 except Exception:
                     pass
 
-            # 1. DRAFTING PHASE
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Drafting Response...'})}\n\n"
-            draft_text = ""
-            chunk_count = 0
+            # 🟢 PHASE 4: Direct Streaming (Bypassing Validator/Formatter)
             for chunk in agent.llm.stream(messages):
                 text_chunk = chunk.content
                 if isinstance(text_chunk, list):
                     text_chunk = "".join(c.get("text", "") if isinstance(c, dict) else str(c) for c in text_chunk)
-                draft_text += text_chunk
-                chunk_count += 1
                 
-                # Send a heartbeat every 20 chunks to keep the SSE connection alive and prevent 3-minute timeouts
-                if chunk_count % 20 == 0:
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'Drafting Response... ({len(draft_text)} bytes)'})}\n\n"
+                draft_text += text_chunk
+                buffer = draft_text
+                
+                # Check for build keyword before streaming it to UI
+                if "[BUILD]" in draft_text:
+                    is_build = True
+                    continue
                     
-            # If it's a build command, bypass validation and formatting!
-            if "[BUILD]" in draft_text:
+                if not first_token_yielded:
+                    # Log the REAL TTFT here!
+                    api_logger.info(f"TTFT_real_content: {(time.time() - start_time) * 1000:.2f}ms")
+                    first_token_yielded = True
+                    
+                yield f"data: {json.dumps({'type': 'chat', 'token': text_chunk})}\n\n"
+                
+            if is_build:
                 try:
                     json_str = draft_text.split("[BUILD]")[1].strip()
                     parsed = json.loads(json_str, strict=False)
                     yield f"data: {json.dumps({'type': 'build', 'data': parsed})}\n\n"
                 except Exception as e:
-                    yield f"data: {json.dumps({'type': 'chat', 'token': '\n\n(Error parsing build parameters. Please try again.)'})}\n\n"
+                    yield f"data: {json.dumps({'type': 'chat', 'token': '(Error parsing build request)'})}\n\n"
                 return
-
-            # 2. VALIDATION PHASE
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Validating Quality...'})}\n\n"
-            validator = ResponseValidatorAgent(llm=agent.llm)
-            validation_result = validator.validate_draft(draft_text, sanitized_message)
             
-            final_text_to_format = validation_result.get("corrected_text", draft_text)
-
-            # 3. FORMATTING PHASE
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Formatting Layout...'})}\n\n"
-            formatter = FormatterAgent(llm=agent.llm)
-            
-            # Clear the status indicator in the UI before streaming text
-            yield f"data: {json.dumps({'type': 'status', 'message': ''})}\n\n"
-
-            # Stream the final response
-            for chunk in formatter.stream_format(final_text_to_format):
-                text_chunk = chunk.content
-                if isinstance(text_chunk, list):
-                    text_chunk = "".join(c.get("text", "") if isinstance(c, dict) else str(c) for c in text_chunk)
-                    
-                yield f"data: {json.dumps({'type': 'chat', 'token': text_chunk})}\n\n"
-            
-            # 🟢 PHASE 3: Autonomous Memory Storage (Post-stream)
-            if "[MEMORY_ADD]" in final_text_to_format:
+            # 🟢 PHASE 5: Autonomous Memory Storage (Post-stream)
+            if "[MEMORY_ADD]" in draft_text:
                 try:
                     import re
-                    memory_match = re.search(r'\[MEMORY_ADD\](.*)', final_text_to_format)
+                    memory_match = re.search(r'\[MEMORY_ADD\](.*)', draft_text)
                     if memory_match:
                         new_fact = memory_match.group(1).strip()
-                        from backend.memory.chroma_client import ChromaClient
                         import asyncio
                         def save_mem():
-                            ChromaClient().store_memory("default_user", new_fact)
+                            if global_chroma_client:
+                                global_chroma_client.store_memory("default_user", new_fact)
+                            else:
+                                from backend.memory.chroma_client import ChromaClient
+                                ChromaClient().store_memory("default_user", new_fact)
                         asyncio.create_task(asyncio.to_thread(save_mem))
                         api_logger.info(f"[MEMORY] Saved new fact: {new_fact}")
                 except Exception as e:
@@ -752,10 +754,13 @@ async def ai_chat(request_data: ChatRequest, request: Request):
             # === SEMANTIC CACHE SET ===
             if len(request_data.history) == 0 and not request_data.image and not is_build:
                 try:
-                    from backend.memory.chroma_client import ChromaClient
                     import asyncio
                     def save_cache():
-                        ChromaClient().set_cache(sanitized_message, buffer)
+                        if global_chroma_client:
+                            global_chroma_client.set_cache(sanitized_message, buffer)
+                        else:
+                            from backend.memory.chroma_client import ChromaClient
+                            ChromaClient().set_cache(sanitized_message, buffer)
                     asyncio.create_task(asyncio.to_thread(save_cache))
                 except Exception as e:
                     print(f"[Semantic Cache] Error setting cache: {e}")

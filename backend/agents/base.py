@@ -48,14 +48,27 @@ class BaseAgent:
                 temperature=self.temperature,
                 max_tokens=4096
             )
+            self.fast_llm = ChatOpenAI(
+                api_key=openai_key.strip(),
+                model="gpt-4o-mini",
+                temperature=0.1,
+                max_tokens=2048
+            )
         elif nvidia_key:
-            print("[DEBUG] Using NVIDIA NIM Endpoint (Llama 3.1 8B)")
+            print("[DEBUG] Using NVIDIA NIM Endpoint (Llama 3.1 70B & 8B)")
             self.llm = ChatOpenAI(
                 base_url="https://integrate.api.nvidia.com/v1",
                 api_key=nvidia_key.strip(),
-                model="meta/llama-3.1-8b-instruct",
+                model="meta/llama-3.1-70b-instruct",
                 temperature=self.temperature,
                 max_tokens=4096
+            )
+            self.fast_llm = ChatOpenAI(
+                base_url="https://integrate.api.nvidia.com/v1",
+                api_key=nvidia_key.strip(),
+                model="meta/llama-3.1-8b-instruct",
+                temperature=0.1,
+                max_tokens=2048
             )
         elif ollama_model:
             print(f"[DEBUG] Using Local Ollama with model: {ollama_model}")
@@ -66,6 +79,7 @@ class BaseAgent:
                 temperature=self.temperature,
                 max_tokens=4096
             )
+            self.fast_llm = self.llm
         elif groq_keys_str:
             keys = [k.strip() for k in groq_keys_str.split(',') if k.strip()]
             chosen_key = random.choice(keys) if keys else "dummy"
@@ -78,6 +92,13 @@ class BaseAgent:
                 temperature=self.temperature,
                 max_tokens=4096
             )
+            self.fast_llm = ChatOpenAI(
+                base_url="https://api.groq.com/openai/v1",
+                api_key=chosen_key,
+                model="llama-3.1-8b-instant",
+                temperature=0.1,
+                max_tokens=2048
+            )
         elif gemini_key:
             print("[DEBUG] Using Native Google Gemini SDK")
             native_model = "gemini-2.0-flash"
@@ -88,6 +109,12 @@ class BaseAgent:
                 temperature=self.temperature,
                 max_tokens=4096
             )
+            self.fast_llm = ChatGoogleGenerativeAI(
+                model="gemini-2.0-flash-lite",
+                google_api_key=gemini_key.strip(),
+                temperature=0.1,
+                max_tokens=2048
+            )
         elif openrouter_key:
             print("[DEBUG] Using Premium OpenRouter (Claude 3.5 Sonnet)")
             self.llm = ChatOpenAI(
@@ -96,6 +123,13 @@ class BaseAgent:
                 model="anthropic/claude-3.5-sonnet",
                 temperature=self.temperature,
                 max_tokens=4096
+            )
+            self.fast_llm = ChatOpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=openrouter_key.strip(),
+                model="meta-llama/llama-3.1-8b-instruct",
+                temperature=0.1,
+                max_tokens=2048
             )
         else:
             print("[DEBUG] Using OpenRouter (Free Tier)")
@@ -106,3 +140,4 @@ class BaseAgent:
                 temperature=self.temperature,
                 max_tokens=4096
             )
+            self.fast_llm = self.llm
