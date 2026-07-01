@@ -6,13 +6,32 @@ class ChromaClient:
     Manages the Vector Database (ChromaDB) for Semantic Memory.
     It stores projects and their architectures so the AI can search for them by 'meaning'.
     """
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(ChromaClient, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self, db_path="./chroma_db"):
+        if self._initialized:
+            return
+            
         # Initialize a local ChromaDB instance
         self.client = chromadb.PersistentClient(path=db_path)
         
-        # Use ChromaDB's default local sentence-transformer model for embeddings
-        # This runs 100% locally and does not require an API key!
-        self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
+        # Use Google Gemini Embeddings for speed (100x faster than local ONNX model on Render CPU)
+        import os
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if gemini_api_key:
+            from chromadb.utils.embedding_functions import GoogleGenerativeAiEmbeddingFunction
+            self.embedding_fn = GoogleGenerativeAiEmbeddingFunction(api_key=gemini_api_key)
+            print("[ChromaDB] Using fast Google Gemini Embeddings.")
+        else:
+            # Fallback to local sentence-transformer model (slow on weak CPUs)
+            self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
+            print("[ChromaDB] Using local DefaultEmbeddingFunction (slow).")
         
         # Get or create our 'blueprints' collection
         self.collection = self.client.get_or_create_collection(
@@ -31,6 +50,8 @@ class ChromaClient:
             name="user_memory",
             embedding_function=self.embedding_fn
         )
+        
+        self._initialized = True
 
     def store_blueprint(self, project_id, goal, blueprint):
         """Stores the project's goal and resulting blueprint into the vector database."""
