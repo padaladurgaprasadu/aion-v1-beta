@@ -434,6 +434,23 @@ async def websocket_generate(websocket: WebSocket):
 
 active_servers = {}
 
+class TutorRequest(BaseModel):
+    query: str
+    history: list = []
+
+@app.post("/api/tutor")
+@limiter.limit("10/minute")
+async def chat_tutor(request: Request, req: TutorRequest):
+    try:
+        from backend.agents.tutor import TutorAgent
+        tutor = TutorAgent()
+        # The agent expects a list of history objects e.g. [{"role": "user", "content": "hi"}, ...]
+        response_text = tutor.respond(req.history, req.query)
+        return {"response": response_text}
+    except Exception as e:
+        print(f"[Error in Tutor Endpoint]: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 class ResumeRequest(BaseModel):
     project_id: str
     action: str = "approve"

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import Auth from './components/Auth'
+import Chat from './components/Chat'
 import Mermaid from './Mermaid'
 import { supabase } from './lib/supabaseClient'
 import ReactMarkdown from 'react-markdown'
@@ -1249,6 +1250,9 @@ function App() {
           </div>
         )}
       </div>
+      
+      {/* Tutor Chat Widget */}
+      <Chat />
     </div>
   )
 }
