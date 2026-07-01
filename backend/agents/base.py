@@ -46,7 +46,7 @@ class BaseAgent:
                 api_key=openai_key.strip(),
                 model="gpt-4o",
                 temperature=self.temperature,
-                max_tokens=4000
+                max_tokens=4096
             )
         elif nvidia_key:
             print("[DEBUG] Using NVIDIA NIM Endpoint (Llama 3.1 8B)")
@@ -55,7 +55,7 @@ class BaseAgent:
                 api_key=nvidia_key.strip(),
                 model="meta/llama-3.1-8b-instruct",
                 temperature=self.temperature,
-                max_tokens=4000
+                max_tokens=4096
             )
         elif ollama_model:
             print(f"[DEBUG] Using Local Ollama with model: {ollama_model}")
@@ -64,7 +64,7 @@ class BaseAgent:
                 api_key="ollama",
                 model=ollama_model,
                 temperature=self.temperature,
-                max_tokens=4000
+                max_tokens=4096
             )
         elif groq_keys_str:
             keys = [k.strip() for k in groq_keys_str.split(',') if k.strip()]
@@ -76,7 +76,7 @@ class BaseAgent:
                 api_key=chosen_key,
                 model="llama-3.3-70b-versatile",
                 temperature=self.temperature,
-                max_tokens=4000
+                max_tokens=4096
             )
         elif gemini_key:
             print("[DEBUG] Using Native Google Gemini SDK")
@@ -86,7 +86,7 @@ class BaseAgent:
                 model=native_model,
                 google_api_key=gemini_key.strip(),
                 temperature=self.temperature,
-                max_tokens=4000
+                max_tokens=4096
             )
         elif openrouter_key:
             print("[DEBUG] Using Premium OpenRouter (Claude 3.5 Sonnet)")
@@ -95,7 +95,7 @@ class BaseAgent:
                 api_key=openrouter_key.strip(),
                 model="anthropic/claude-3.5-sonnet",
                 temperature=self.temperature,
-                max_tokens=4000
+                max_tokens=4096
             )
         else:
             print("[DEBUG] Using OpenRouter (Free Tier)")
@@ -104,5 +104,5 @@ class BaseAgent:
                 api_key=openrouter_key or "dummy_key",
                 model="google/gemini-2.0-flash-lite-preview-02-05:free",
                 temperature=self.temperature,
-                max_tokens=3000
+                max_tokens=4096
             )
