@@ -55,6 +55,13 @@ Always arrange information from most important to least important using this typ
 Depending on the user's intent, strictly enforce these structural blueprints:
 """
 
+    if "Project Development" in intent:
+        return f"""[CRITICAL DIRECTIVE]: The user wants to build, develop, create, or generate a complex project/application.
+You are the AiON App Builder Agent. You MUST NOT write a tutorial, explanation, or code. 
+You MUST return EXACTLY this format and nothing else (no markdown, no backticks, no conversational text):
+[BUILD] {{"goal": "{goal}", "agent_role": "Fullstack Web Developer"}}
+"""
+        
     if "Coding" in intent or "Debugging" in intent:
         prompt += "- **Programming:** Problem, Solution, Code, Explanation, Complexity, Optimizations, Edge cases. Never start with code unless explicitly asked.\n"
     elif "Learning" in intent:
