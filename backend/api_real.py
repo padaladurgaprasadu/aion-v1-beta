@@ -333,7 +333,28 @@ async def websocket_generate(websocket: WebSocket):
                 if state_snapshot.next:
                     q.put({"type": "INTERRUPT", "message": "Awaiting human approval before DevOps deployment."})
                 else:
-                    q.put({"type": "GRAPH_DONE", "state": final_st or initial_state})
+                    final_state_data = final_st or initial_state
+                    
+                    # Phase 1: Persistent Project Memory (Save to PostgreSQL)
+                    try:
+                        from backend.db.database import SessionLocal
+                        from backend.db.models import Project
+                        
+                        db = SessionLocal()
+                        db_project = Project(
+                            id=project_id,
+                            name=f"Project {project_id[:8]}",
+                            goal=final_state_data.get("goal", ""),
+                            blueprint=final_state_data.get("blueprint", {})
+                        )
+                        db.merge(db_project)
+                        db.commit()
+                        db.close()
+                        print(f"✅ [Memory] Project {project_id} permanently saved to PostgreSQL.")
+                    except Exception as db_err:
+                        print(f"❌ [Memory] Failed to save project to PostgreSQL: {db_err}")
+                        
+                    q.put({"type": "GRAPH_DONE", "state": final_state_data})
             except Exception as e:
                 import traceback
                 trace = traceback.format_exc()

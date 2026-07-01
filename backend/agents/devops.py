@@ -68,6 +68,16 @@ class DevOpsAgent(BaseAgent):
                 
             state["code_files"] = current_files
             
+            # Phase 1: Persistent Project Memory (Log to Neo4j)
+            try:
+                from backend.memory.neo4j_client import Neo4jClient
+                client = Neo4jClient()
+                rationale = f"Configured containerized deployment with: {', '.join(devops_files.keys())}"
+                client.log_decision(state['project_id'], "DevOps", rationale)
+                client.close()
+                print("   -> [Memory] Deployment decision saved to Neo4j.")
+            except Exception as e:
+                print(f"   -> [WARNING] Could not save DevOps decision to memory: {e}")
         except json.JSONDecodeError as e:
             print(f"   -> [DevOps] ERROR parsing DevOps files: {e}")
             # Non-fatal error, the project still works without Docker
