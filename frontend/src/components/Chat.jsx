@@ -33,7 +33,9 @@ export default function Chat() {
     setMessages(prev => [...prev, { role: 'user', content: query }]);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      // Use VITE_API_URL if defined, otherwise fallback to the current window's origin
+      // This ensures it works seamlessly in production (e.g. Render) where frontend/backend share a host
+      const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
       const response = await fetch(`${apiUrl}/api/tutor`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

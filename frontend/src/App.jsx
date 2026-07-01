@@ -35,7 +35,7 @@ const handleMarkdownClick = async (e) => {
     if (lang === 'py') pistonLang = 'python';
     
     // Use VITE_API_URL or local fallback
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
     
     try {
       const res = await fetch(`${apiUrl}/api/execute`, {
@@ -133,7 +133,8 @@ const renderMessageContent = (content) => {
 };
 
 function App() {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  // API_URL resolution (works for localhost and production)
+  const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
   const WS_URL = API_URL.replace(/^http/, 'ws');
   
   const [goal, setGoal] = useState('')
@@ -1151,7 +1152,7 @@ function App() {
                                     ↗ New Tab
                                 </button>
                             )}
-                            <button onClick={() => window.location.href = 'http://localhost:8000/api/download'} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'var(--text-primary)' }}>
+                            <button onClick={() => window.location.href = `${API_URL}/api/download`} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'var(--text-primary)' }}>
                                 ↓ Download
                             </button>
                         </div>
