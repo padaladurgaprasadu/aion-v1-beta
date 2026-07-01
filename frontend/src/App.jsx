@@ -432,7 +432,10 @@ function App() {
                         // Append token to the last AI message
                         setChatMessages(prev => {
                             const newMsgs = [...prev];
-                            newMsgs[newMsgs.length - 1].content += data.token;
+                            newMsgs[newMsgs.length - 1] = {
+                                ...newMsgs[newMsgs.length - 1],
+                                content: newMsgs[newMsgs.length - 1].content + data.token
+                            };
                             return newMsgs;
                         });
                     } else if (data.type === 'status') {
@@ -450,7 +453,10 @@ function App() {
                     } else if (data.type === 'visual') {
                         setChatMessages(prev => {
                             const newMsgs = [...prev];
-                            newMsgs[newMsgs.length - 1].visual = data;
+                            newMsgs[newMsgs.length - 1] = {
+                                ...newMsgs[newMsgs.length - 1],
+                                visual: data
+                            };
                             return newMsgs;
                         });
                     }
