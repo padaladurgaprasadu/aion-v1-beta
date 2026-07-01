@@ -276,6 +276,12 @@ async def websocket_generate(websocket: WebSocket):
             await websocket.close()
             return
             
+        import queue
+        import asyncio
+        
+        q = queue.Queue()
+        stream_queues[project_id] = q
+
         initial_state = AiONState(
             goal=goal,
             project_id=project_id,
@@ -285,18 +291,14 @@ async def websocket_generate(websocket: WebSocket):
             blueprint=blueprint,
             code_files={},
             error=None,
+            runtime_error=None,
             review_feedback=None,
             revision_count=0,
             execution_retries=0,
             execution_logs=[],
-            semantic_context=None
+            semantic_context=None,
+            stream_queue=q
         )
-        
-        import queue
-        import asyncio
-        
-        q = queue.Queue()
-        stream_queues[project_id] = q
         
         graph = build_generate_graph()
         

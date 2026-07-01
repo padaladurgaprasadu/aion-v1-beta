@@ -77,11 +77,11 @@ class CoderAgent(BaseAgent):
         files_to_generate = state["blueprint"].get("file_structure", ["src/server.js", "package.json"])
         
         blueprint_str = json.dumps(state["blueprint"])
-        feedback = state.get("review_feedback", "None")
-        runtime_error = state.get("runtime_error", "None")
+        feedback = state.get("review_feedback")
+        runtime_error = state.get("runtime_error")
         
         # --- NEXT-GEN AUTO-HEALING DIAGNOSTIC ---
-        if runtime_error != "None" or feedback != "None":
+        if runtime_error or feedback:
             print(f"[Coder] Next-Gen Auto-Healing: Diagnosing failing files...")
             diagnostic_prompt = ChatPromptTemplate.from_messages([
                 ("system", "You are an elite debugging AI. Given a list of files in the project, and a runtime error or review feedback, identify exactly which files need to be modified to fix the issue. Output EXACTLY a JSON list of strings (the exact file paths from the provided list) and nothing else."),
@@ -113,9 +113,8 @@ class CoderAgent(BaseAgent):
         semantic_context = state.get("semantic_context", "No semantic context provided.")
         project_id = state.get("project_id")
         
-        # Access the global stream queue if it exists
-        from backend.api import stream_queues
-        q = stream_queues.get(project_id)
+        # Access the global stream queue directly from state to avoid circular import issues
+        q = state.get("stream_queue")
         
         # Custom LangChain callback to stream tokens to our queue
         from langchain.callbacks.base import BaseCallbackHandler
@@ -125,9 +124,9 @@ class CoderAgent(BaseAgent):
                     q.put({"type": "code_token", "token": token})
 
         # Increment revision count if we are looping
-        if feedback != "None" or runtime_error != "None":
+        if feedback or runtime_error:
             state["revision_count"] = state.get("revision_count", 0) + 1
-            if runtime_error != "None":
+            if runtime_error:
                 print(f"[Coder] Auto-Heal Triggered! Attempting to fix runtime error...")
                 if q:
                     q.put({"type": "progress", "message": "Auto-Heal Triggered! Attempting to fix runtime error..."})
