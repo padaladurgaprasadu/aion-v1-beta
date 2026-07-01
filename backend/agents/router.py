@@ -43,7 +43,11 @@ RULES:
   "missing_info_question": "Null if no info is missing. Otherwise, a string with the exact clarifying question.",
   "response_style": "Selected from Step 5",
   "answer_length": "Selected from Step 6",
-  "sections_to_include": ["Selected from Step 7"]
+  "sections_to_include": ["Selected from Step 7"],
+  "needs_images": true/false (True ONLY for Places, Monuments, Animals, famous People, or physical Products. False for Code, Math, Abstract Concepts),
+  "needs_map": true/false (True ONLY for geographical locations or directions),
+  "needs_video": true/false (True ONLY if the user explicitly asks for a video/tutorial),
+  "visual_query": "The exact name of the entity to search for images (e.g. 'Adiyogi Statue', 'Albert Einstein'). Null if needs_images is false."
 }
 
 Clarification Rules (MANDATORY):

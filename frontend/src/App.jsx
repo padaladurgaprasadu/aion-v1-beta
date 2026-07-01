@@ -3,8 +3,9 @@ import './App.css'
 import Auth from './components/Auth'
 import Mermaid from './Mermaid'
 import { supabase } from './lib/supabaseClient'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 
 const handleMarkdownClick = async (e) => {
   const target = e.target;
@@ -60,47 +61,48 @@ const handleMarkdownClick = async (e) => {
   }
 };
 
-// Configure marked to use breaks
-marked.setOptions({
-  breaks: true,
-  gfm: true
-})
-
-marked.use({
-  renderer: {
-    code({ text, lang }) {
-      const language = lang || 'text';
-      const safeCodeForDisplay = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const encodedCode = encodeURIComponent(text);
-      const blockId = Math.random().toString(36).substring(2, 9);
-      
-      const supportedRunLangs = ['python', 'py', 'javascript', 'js', 'node'];
-      const runBtnHTML = supportedRunLangs.includes(language.toLowerCase()) 
-        ? `<button class="run-code-btn" data-code="${encodedCode}" data-lang="${language}" data-block-id="${blockId}" style="background: none; border: none; color: #4ade80; cursor: pointer; font-size: 0.75rem; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#4ade80'">Run</button>`
-        : '';
-        
-      return `
-        <div class="code-block-wrapper" style="position: relative; margin: 1em 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color);">
-          <div style="background: #1e1e1e; padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); color: #888; font-size: 0.75rem; font-family: monospace;">
-            <span>${language}</span>
-            <div style="display: flex; gap: 16px;">
-              ${runBtnHTML}
-              <button class="copy-code-btn" data-code="${encodedCode}" style="background: none; border: none; color: #aaa; cursor: pointer; font-size: 0.75rem; transition: color 0.2s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#aaa'">Copy</button>
-            </div>
-          </div>
-          <pre style="margin: 0; border-radius: 0; padding: 16px; background: #0d0d0d; overflow-x: auto;"><code class="language-${language}">${safeCodeForDisplay}</code></pre>
-          <div id="sandbox-${blockId}" style="display: none; border-top: 1px dashed var(--border-color); background: #050505;"></div>
-        </div>
-      `;
-    }
+const CodeBlock = ({ node, inline, className, children, ...props }) => {
+  const match = /language-(\w+)/.exec(className || '');
+  const language = match ? match[1] : 'text';
+  const text = String(children).replace(/\n$/, '');
+  
+  if (inline) {
+    return <code className={className} {...props}>{children}</code>;
   }
-});
+  
+  const encodedCode = encodeURIComponent(text);
+  const blockId = Math.random().toString(36).substring(2, 9);
+  
+  const supportedRunLangs = ['python', 'py', 'javascript', 'js', 'node'];
+  const runBtnHTML = supportedRunLangs.includes(language.toLowerCase()) 
+    ? <button className="run-code-btn" data-code={encodedCode} data-lang={language} data-block-id={blockId} style={{background: 'none', border: 'none', color: '#4ade80', cursor: 'pointer', fontSize: '0.75rem', transition: 'color 0.2s'}} onMouseOver={(e)=>e.target.style.color='#fff'} onMouseOut={(e)=>e.target.style.color='#4ade80'}>Run</button>
+    : null;
+    
+  return (
+    <div className="code-block-wrapper" style={{ position: 'relative', margin: '1em 0', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+      <div style={{ background: '#1e1e1e', padding: '6px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', color: '#888', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+        <span>{language}</span>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          {runBtnHTML}
+          <button className="copy-code-btn" data-code={encodedCode} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '0.75rem', transition: 'color 0.2s' }} onMouseOver={(e)=>e.target.style.color='#fff'} onMouseOut={(e)=>e.target.style.color='#aaa'}>Copy</button>
+        </div>
+      </div>
+      <pre style={{ margin: 0, borderRadius: 0, padding: '16px', background: '#0d0d0d', overflowX: 'auto' }}>
+        <code className={className} {...props}>{children}</code>
+      </pre>
+      <div id={`sandbox-${blockId}`} style={{ display: 'none', borderTop: '1px dashed var(--border-color)', background: '#050505' }}></div>
+    </div>
+  );
+};
 
 const renderMessageContent = (content) => {
   if (!content.includes('<mermaid>')) {
-      const htmlContent = DOMPurify.sanitize(marked.parse(content));
       return (
-          <div className="markdown-body" onClick={handleMarkdownClick} dangerouslySetInnerHTML={{ __html: htmlContent }} />
+          <div className="markdown-body" onClick={handleMarkdownClick}>
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={{ code: CodeBlock }}>
+                  {content}
+              </ReactMarkdown>
+          </div>
       );
   }
   
@@ -109,15 +111,22 @@ const renderMessageContent = (content) => {
       if (part.startsWith('<mermaid>') && part.endsWith('</mermaid>')) {
           const chart = part.replace('<mermaid>', '').replace('</mermaid>', '').trim();
           if (!chart || chart.length < 5 || !chart.includes('\n')) {
-              // It's probably just an inline mention, render as text
-              const htmlContent = DOMPurify.sanitize(marked.parse(part.replace(/</g, '&lt;').replace(/>/g, '&gt;')));
-              return <div key={i} className="markdown-body" dangerouslySetInnerHTML={{ __html: htmlContent }} />;
+              return (
+                <div key={i} className="markdown-body" onClick={handleMarkdownClick}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={{ code: CodeBlock }}>
+                        {part}
+                    </ReactMarkdown>
+                </div>
+              );
           }
           return <Mermaid key={i} chart={chart} />;
       }
-      const htmlContent = DOMPurify.sanitize(marked.parse(part));
       return (
-          <div key={i} className="markdown-body" onClick={handleMarkdownClick} dangerouslySetInnerHTML={{ __html: htmlContent }} />
+          <div key={i} className="markdown-body" onClick={handleMarkdownClick}>
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={{ code: CodeBlock }}>
+                  {part}
+              </ReactMarkdown>
+          </div>
       );
   });
 };
@@ -438,6 +447,12 @@ function App() {
                         setGoal(data.data.goal);
                         setAgentRole(data.data.agent_role);
                         handlePlan(data.data.goal, data.data.agent_role, imagePayload);
+                    } else if (data.type === 'visual') {
+                        setChatMessages(prev => {
+                            const newMsgs = [...prev];
+                            newMsgs[newMsgs.length - 1].visual = data;
+                            return newMsgs;
+                        });
                     }
                 } catch (e) {
                     console.error("Error parsing stream line:", part);
@@ -840,7 +855,12 @@ function App() {
                         <img src={msg.image} alt="Uploaded" style={{ maxWidth: '300px', maxHeight: '300px', borderRadius: '8px', border: '1px solid #444', objectFit: 'contain' }} />
                       </div>
                     )}
-                    {renderMessageContent(msg.content)}
+                    {msg.visual && msg.visual.media_type === 'image' && (
+                      <div style={{ marginBottom: '16px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)', width: 'fit-content' }}>
+                        <img src={msg.visual.url} alt={msg.visual.alt} style={{ maxWidth: '400px', maxHeight: '300px', width: '100%', objectFit: 'cover', display: 'block' }} />
+                      </div>
+                    )}
+                    {renderMessageContent(msg.content + (idx === chatMessages.length - 1 && isChatLoading && msg.role === 'ai' ? ' ▋' : ''))}
                     {msg.role === 'ai' && (
                       <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                         <button 

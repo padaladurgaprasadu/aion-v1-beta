@@ -629,6 +629,26 @@ async def ai_chat(request_data: ChatRequest, request: Request):
                 yield f"data: {json.dumps({'type': 'chat', 'token': missing_info})}\n\n"
                 return
 
+            # --- VISUAL DECISION ENGINE INTEGRATION ---
+            if intent_data.get("needs_images") and intent_data.get("visual_query") and intent_data.get("visual_query").lower() not in ["null", "none"]:
+                yield f"data: {json.dumps({'type': 'status', 'message': '📸 Fetching Visuals...'})}\n\n"
+                from backend.utils.visuals import get_wiki_image
+                import asyncio
+                
+                try:
+                    img_url = await asyncio.to_thread(get_wiki_image, intent_data["visual_query"])
+                    if img_url:
+                        visual_payload = {
+                            "type": "visual",
+                            "media_type": "image",
+                            "url": img_url,
+                            "alt": intent_data["visual_query"]
+                        }
+                        yield f"data: {json.dumps(visual_payload)}\n\n"
+                except Exception as e:
+                    api_logger.warning(f"Error fetching visuals: {e}")
+            # -------------------------------------------
+
             base_prompt = get_system_prompt(intent_data)
 
             # 🟢 PHASE 3: Conditional Memory Retrieval
