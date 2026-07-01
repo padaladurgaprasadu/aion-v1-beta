@@ -167,10 +167,11 @@ function App() {
   const [codeFiles, setCodeFiles] = useState(null)
   const [executionLogs, setExecutionLogs] = useState([])
   
-  // Phase 5 additions
+  // Streaming state
   const [liveUpdates, setLiveUpdates] = useState([])
-
-  // Phase 7 additions
+  const [liveCodeFiles, setLiveCodeFiles] = useState({})
+  
+  // Execution state
   const [isPreviewRunning, setIsPreviewRunning] = useState(false)
   const [awaitingApproval, setAwaitingApproval] = useState(false)
   const [previewPort, setPreviewPort] = useState(null)
