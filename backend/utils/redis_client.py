@@ -3,14 +3,18 @@ import redis
 
 # Redis connection string
 # Fallback to local Docker setup if not provided in .env
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = os.getenv("REDIS_URL", None)
 
-# Create a global Redis connection pool
-redis_pool = redis.ConnectionPool.from_url(REDIS_URL, decode_responses=True)
+# Create a global Redis connection pool if URL is provided
+redis_pool = redis.ConnectionPool.from_url(REDIS_URL, decode_responses=True) if REDIS_URL else None
 
-def get_redis_client() -> redis.Redis:
+def get_redis_client():
     """
     Returns a configured Redis client using the global connection pool.
-    decode_responses=True ensures we get Python strings instead of bytes.
+    Returns None if Redis is not configured.
     """
+    if not redis_pool:
+        return None
     return redis.Redis(connection_pool=redis_pool)
+
+

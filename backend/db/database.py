@@ -3,17 +3,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 # PostgreSQL connection string
-# Fallback to local Docker setup if not provided in .env
+# Fallback to local SQLite if Postgres is not provided in .env
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://aion_user:aion_password@localhost:5432/aion_db"
+    "sqlite:///./aion_local.db"
 )
+
+# Connect args needed for SQLite
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
 # Initialize the SQLAlchemy Engine
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True, # Test connections before handing them out
-    echo=False # Set to True for SQL query logging
+    echo=False, # Set to True for SQL query logging
+    connect_args=connect_args
 )
 
 # Create a configured "Session" class
