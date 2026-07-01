@@ -435,7 +435,7 @@ function App() {
                         });
                         setGoal(data.data.goal);
                         setAgentRole(data.data.agent_role);
-                        handlePlan(data.data.goal, data.data.agent_role);
+                        handlePlan(data.data.goal, data.data.agent_role, imagePayload);
                     }
                 } catch (e) {
                     console.error("Error parsing stream line:", part);
@@ -472,7 +472,7 @@ function App() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages])
 
-  const handlePlan = async (buildGoal, buildRole) => {
+  const handlePlan = async (buildGoal, buildRole, buildImage = null) => {
     if (!buildGoal) return
 
     setIsLoading(true)
@@ -485,13 +485,18 @@ function App() {
     setIsLoading(false) // We won't use the generic spinner anymore
 
     try {
+      const payload = { goal: buildGoal, agent_role: buildRole };
+      if (buildImage) {
+          payload.image = buildImage;
+      }
+      
       const response = await fetch(`${API_URL}/api/plan`, {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session?.access_token || 'mock-token-for-local-dev'}`
         },
-        body: JSON.stringify({ goal: buildGoal, agent_role: buildRole })
+        body: JSON.stringify(payload)
       })
       
       if (!response.ok) {

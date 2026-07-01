@@ -18,23 +18,31 @@ class PlannerAgent(BaseAgent):
         logger.info(f"[Planner] Breaking down goal for role: {agent_role}...")
         
         if "Research" in agent_role:
-            sys_prompt = "You are an AI {agent_role}. The user has a research goal. You MUST provide a NOVEL APPROACH to this research. Return a JSON object with a key 'tasks' which is a list of objects. Each object should have 'id' (string, no spaces), 'name' (string), and 'depends_on' (list of string ids it depends on). Do not write software code."
+            sys_prompt = f"You are an AI {agent_role}. The user has a research goal. You MUST provide a NOVEL APPROACH to this research. Return a JSON object with a key 'tasks' which is a list of objects. Each object should have 'id' (string, no spaces), 'name' (string), and 'depends_on' (list of string ids it depends on). Do not write software code."
         else:
-            sys_prompt = "You are an AI {agent_role} Planner. Given a user's goal, break it down into a logical DAG (Directed Acyclic Graph) of tasks. Return ONLY valid JSON with a key 'tasks' which is a list of objects. Each object should have 'id' (string, e.g. 'auth'), 'name' (string, e.g. 'Authentication'), and 'depends_on' (list of string ids it depends on, e.g. [] or ['db']). E.g. {{\"tasks\": [{{\"id\": \"db\", \"name\": \"Database\", \"depends_on\": []}}, {{\"id\": \"auth\", \"name\": \"Authentication\", \"depends_on\": [\"db\"]}}]}}"
+            sys_prompt = f"You are an AI {agent_role} Planner. Given a user's goal, break it down into a logical DAG (Directed Acyclic Graph) of tasks. Return ONLY valid JSON with a key 'tasks' which is a list of objects. Each object should have 'id' (string, e.g. 'auth'), 'name' (string, e.g. 'Authentication'), and 'depends_on' (list of string ids it depends on, e.g. [] or ['db']). E.g. {{\"tasks\": [{{\"id\": \"db\", \"name\": \"Database\", \"depends_on\": []}}, {{\"id\": \"auth\", \"name\": \"Authentication\", \"depends_on\": [\"db\"]}}]}}"
             
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", sys_prompt),
-            ("human", "Goal: {goal}")
-        ])
-        chain = prompt | self.llm
-        
         goal = state["goal"]
+        image_url = state.get("image", None)
+        
+        from langchain_core.messages import SystemMessage, HumanMessage
+        
+        if image_url:
+            sys_prompt += "\n\nCRITICAL UI ARCHITECT RULE: The user has provided an image screenshot of a UI they want to build. You MUST analyze this screenshot visually. In your generated tasks/modules, explicitly include frontend components that match the layout, features, and interactive elements visible in the screenshot (e.g. 'HeroSection', 'SidebarNav', 'ProductGrid')."
+            human_content = [
+                {"type": "text", "text": f"Goal: {goal}"},
+                {"type": "image_url", "image_url": {"url": image_url}}
+            ]
+        else:
+            human_content = f"Goal: {goal}"
+            
+        messages = [
+            SystemMessage(content=sys_prompt),
+            HumanMessage(content=human_content)
+        ]
         
         # Ask the AI to generate the DAG
-        response = chain.invoke({
-            "goal": goal,
-            "agent_role": agent_role
-        })
+        response = self.llm.invoke(messages)
         
         content = response.content
         if isinstance(content, list):

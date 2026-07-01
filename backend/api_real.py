@@ -171,6 +171,7 @@ app.add_middleware(
 class PlanRequest(BaseModel):
     goal: str
     agent_role: str = "Fullstack Web Developer"
+    image: typing.Optional[str] = None
 
 class GenerateRequest(BaseModel):
     project_id: str
@@ -186,6 +187,7 @@ async def plan_project(request_data: PlanRequest, request: Request, auth: dict =
     from backend.agents.planner import PlannerAgent
     from backend.agents.architect import ArchitectAgent
     from backend.memory.chroma_client import ChromaClient
+    from backend.memory.neo4j_client import Neo4jClient
     from langchain_core.messages import SystemMessage, HumanMessage
 
     if not request_data.goal:
@@ -204,6 +206,8 @@ async def plan_project(request_data: PlanRequest, request: Request, auth: dict =
     # 1. Run Planner synchronously
     planner = PlannerAgent()
     state = AiONState(goal=goal, project_id=project_id, agent_role=request_data.agent_role, modules=[])
+    if request_data.image:
+        state["image"] = request_data.image
     planned_state = planner.run(state)
     modules = planned_state.get("modules", [])
 
